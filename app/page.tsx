@@ -407,7 +407,7 @@ export default function Home() {
           data.date = lastResult.text;
           
           // If time was explicitly specified in the text, we can help the handler
-          if (lastResult.start.knownValues.hour !== undefined) {
+          if (lastResult.start.isCertain('hour')) {
              const h = lastResult.start.get('hour')!;
              const m = lastResult.start.get('minute') || 0;
              data.time = h.toString().padStart(2, '0') + ":" + m.toString().padStart(2, '0');
@@ -487,7 +487,7 @@ export default function Home() {
 
         const parsedDate = parsedResult.start.date();
         const dKey = dateKey(parsedDate);
-        const hasTime = parsedResult.start.knownValues.hour !== undefined;
+        const hasTime = parsedResult.start.isCertain('hour');
         const tStr = hasTime ? parsedDate.getHours().toString().padStart(2, '0') + ":" + parsedDate.getMinutes().toString().padStart(2, '0') : null;
 
         const payload = {
@@ -591,7 +591,7 @@ export default function Home() {
         
         const parsedDate = parsedResult.start.date();
         const newDKey = dateKey(parsedDate);
-        const hasTime = parsedResult.start.knownValues.hour !== undefined;
+        const hasTime = parsedResult.start.isCertain('hour');
         const newTStr = hasTime ? parsedDate.getHours().toString().padStart(2, '0') + ":" + parsedDate.getMinutes().toString().padStart(2, '0') : null;
 
         const payload = {
