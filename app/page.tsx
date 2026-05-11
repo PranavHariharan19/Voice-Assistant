@@ -3,6 +3,8 @@
 import { FormEvent, useEffect, useMemo, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import * as chrono from "chrono-node";
+import { useAuth } from "@/lib/auth-context";
+import { useRouter } from "next/navigation";
 
 type CalendarEvent = {
   id: number | string;
@@ -156,6 +158,8 @@ function groupEvents(events: CalendarEvent[]) {
 }
 
 export default function Home() {
+  const { user, loading: authLoading, initialized, signOut } = useAuth();
+  const router = useRouter();
   const today = useMemo(() => new Date(), []);
   const [activeMonth, setActiveMonth] = useState(
     () => new Date(today.getFullYear(), today.getMonth(), 1),
@@ -235,12 +239,20 @@ export default function Home() {
     activeMonth.getMonth() === today.getMonth();
 
   useEffect(() => {
+    if (initialized && !user) {
+      router.push("/login");
+    }
+  }, [user, initialized, router]);
+
+  useEffect(() => {
+    if (!user) return;
     let isMounted = true;
 
     async function loadEvents() {
       const { data, error } = await supabase
         .from("events")
         .select("event_id,event_name,event_date,event_time,additional_info")
+        .eq("user_id", user?.id)
         .order("event_date", { ascending: true });
 
       if (!isMounted) {
@@ -261,7 +273,7 @@ export default function Home() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -320,7 +332,8 @@ export default function Home() {
           const { error } = await supabase
             .from("events")
             .delete()
-            .eq("event_date", tKey);
+            .eq("event_date", tKey)
+            .eq("user_id", user?.id);
 
           if (error) {
              systemReply("Failed to delete events.");
@@ -354,6 +367,31 @@ export default function Home() {
         return;
       }
 
+      if (ctx.missing === "disambiguate_date") {
+        const parsed = chrono.parse(transcript);
+        if (parsed.length > 0) {
+          const d = dateKey(parsed[0].start.date());
+          const allEvents = Object.values(eventsByDate).flat();
+          const matches = allEvents.filter(e => 
+            (e.title.toLowerCase().includes(ctx.data.event_name.toLowerCase())) && 
+            e.date === d
+          );
+          if (matches.length === 1) {
+            const target = matches[0];
+            pendingContextRef.current = null;
+            if (ctx.intent === "disambiguate_delete") {
+              await handleIntent("delete_event", { ...ctx.data, targetId: target.id, targetDate: target.date, forceTarget: true });
+            } else {
+              await handleIntent("reschedule_event", { ...ctx.data, targetId: target.id, targetDate: target.date, forceTarget: true });
+            }
+            return;
+          } else {
+            systemReply(`I couldn't find a unique event named "${ctx.data.event_name}" on that date.`);
+            pendingContextRef.current = null;
+            return;
+          }
+        }
+      }
       if (ctx.missing === "event_name") {
         ctx.data.event_name = transcript;
       } else if (ctx.missing === "date") {
@@ -388,12 +426,12 @@ export default function Home() {
       let intent = null;
       let data: any = {};
 
-      if (textLower.includes("create") || textLower.includes("schedule") || textLower.includes("add")) {
-        intent = "create_event";
+      if (textLower.includes("reschedule") || textLower.includes("move") || textLower.includes("shift")) {
+        intent = "reschedule_event";
       } else if (textLower.includes("delete") || textLower.includes("remove") || textLower.includes("cancel")) {
         intent = "delete_event";
-      } else if (textLower.includes("reschedule") || textLower.includes("move") || textLower.includes("shift")) {
-        intent = "reschedule_event";
+      } else if (textLower.includes("create") || textLower.includes("schedule") || textLower.includes("add")) {
+        intent = "create_event";
       } else if (textLower.includes("find") || textLower.includes("search") || textLower.includes("show")) {
         intent = "query_events";
       }
@@ -495,6 +533,7 @@ export default function Home() {
           event_date: dKey,
           event_time: tStr,
           additional_info: data.additional_info || "",
+          user_id: user?.id,
         };
 
         const { data: inserted, error } = await supabase
@@ -534,11 +573,13 @@ export default function Home() {
           systemReply(`I couldn't find an event named ${data.event_name}.`);
           return;
         } else if (matches.length > 1) {
-          systemReply(`I found multiple events named ${data.event_name}. Please delete it manually.`);
+          pendingContextRef.current = { intent: "disambiguate_delete", data, missing: "disambiguate_date" };
+          systemReply(`I found multiple events named "${data.event_name}". When is the one you want to delete happening?`, true);
           return;
         }
 
-        const toDelete = matches[0];
+        const toDelete = data.forceTarget ? Object.values(eventsByDate).flat().find(e => e.id === data.targetId) : matches[0];
+        if (!toDelete) return;
         
         pendingContextRef.current = { intent: "confirm_delete", data: { eventId: toDelete.id, eventDate: toDelete.date }, missing: "" };
         const parsedToDate = parseDateKey(toDelete.date);
@@ -574,11 +615,13 @@ export default function Home() {
           systemReply(`I couldn't find an event named ${data.event_name}.`);
           return;
         } else if (matches.length > 1) {
-          systemReply(`I found multiple events named ${data.event_name}. Please reschedule it manually.`);
+          pendingContextRef.current = { intent: "disambiguate_reschedule", data, missing: "disambiguate_date" };
+          systemReply(`I found multiple events named "${data.event_name}". When is the one you want to reschedule happening?`, true);
           return;
         }
 
-        const toReschedule = matches[0];
+        const toReschedule = data.forceTarget ? Object.values(eventsByDate).flat().find(e => e.id === data.targetId) : matches[0];
+        if (!toReschedule) return;
         const parsedDateStr = (data.date || "") + " " + (data.time || "");
         const parsedResults = chrono.parse(parsedDateStr);
         const parsedResult = parsedResults[0];
@@ -599,6 +642,7 @@ export default function Home() {
           event_date: newDKey,
           event_time: newTStr || null,
           additional_info: toReschedule.additionalInformation || "",
+          user_id: user?.id,
         };
 
         const { data: updated, error } = await supabase
@@ -746,7 +790,8 @@ export default function Home() {
     const { error } = await supabase
       .from("events")
       .delete()
-      .eq("event_id", selectedEvent.id);
+      .eq("event_id", selectedEvent.id)
+      .eq("user_id", user?.id);
 
     if (error) {
       console.error("Could not remove event:", error.message);
@@ -767,7 +812,8 @@ export default function Home() {
     const { error } = await supabase
       .from("events")
       .delete()
-      .eq("event_id", eventId);
+      .eq("event_id", eventId)
+      .eq("user_id", user?.id);
 
     if (error) {
       console.error("Could not delete event:", error.message);
@@ -794,6 +840,7 @@ export default function Home() {
       .from("events")
       .update({ event_date: newDate })
       .eq("event_id", eventId)
+      .eq("user_id", user?.id)
       .select("event_id,event_name,event_date,event_time,additional_info")
       .single();
 
@@ -846,6 +893,7 @@ export default function Home() {
       event_date: eventDate,
       event_time: formValues.time || null,
       additional_info: formValues.additionalInformation.trim() || null,
+      user_id: user?.id,
     };
 
     if (formMode === "add") {
@@ -891,6 +939,7 @@ export default function Home() {
       .from("events")
       .update(payload)
       .eq("event_id", selectedEvent.id)
+      .eq("user_id", user?.id)
       .select("event_id,event_name,event_date,event_time,additional_info")
       .single();
 
@@ -967,6 +1016,16 @@ export default function Home() {
     </div>
   );
 
+  if (authLoading) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-[#E4DDD3]">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#00A19B] border-t-transparent"></div>
+          <p className="font-bold text-[#17211F]/60">Syncing your calendar...</p>
+        </div>
+      </div>
+    );
+  }
   return (
     <main className="min-h-screen overflow-hidden bg-[#E4DDD3] text-[#17211f]">
       <section className="relative mx-auto flex min-h-screen w-full max-w-[1600px] flex-col px-5 py-6 sm:px-8 lg:px-10">
@@ -1071,9 +1130,7 @@ export default function Home() {
                   className="rounded-full border border-[#00A19B]/40 bg-[#00A19B] px-4 py-2 text-sm font-semibold text-white shadow-[0_12px_28px_rgba(0,161,155,0.28)] transition hover:-translate-y-0.5"
                   type="button"
                   onClick={() => {
-                    setActiveMonth(
-                      new Date(today.getFullYear(), today.getMonth(), 1),
-                    );
+                    setActiveMonth(new Date(today.getFullYear(), today.getMonth(), 1));
                     selectDate(today);
                     setIsMonthSelectorOpen(false);
                     setIsYearSelectorOpen(false);
@@ -1190,10 +1247,19 @@ export default function Home() {
                     {selectedDate.toLocaleDateString("en-GB")}
                   </h2>
                 </div>
-                <span className="rounded-full bg-[#17211f] px-3 py-1 text-xs font-bold text-[#E4DDD3]">
-                  {selectedEvents.length} event
-                  {selectedEvents.length === 1 ? "" : "s"}
-                </span>
+                <div className="flex flex-col items-end gap-2">
+                  <span className="rounded-full bg-[#17211f] px-3 py-1 text-xs font-bold text-[#E4DDD3]">
+                    {selectedEvents.length} event
+                    {selectedEvents.length === 1 ? "" : "s"}
+                  </span>
+                  <button
+                    className="rounded-full border border-[#D56B68]/30 bg-[#D56B68]/10 px-3 py-1.5 text-xs font-bold text-[#D56B68] transition-all hover:bg-[#D56B68] hover:text-white"
+                    type="button"
+                    onClick={() => signOut()}
+                  >
+                    Logout
+                  </button>
+                </div>
               </div>
 
               <div className="mt-5 space-y-3">

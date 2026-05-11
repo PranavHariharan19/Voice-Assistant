@@ -13,86 +13,49 @@ export async function POST(request: Request) {
 
     const prompt = `
 Extract calendar intent from the following transcript.
-Return ONLY valid JSON. Do not return any other text, markdown formatting, or explanations.
+Return ONLY valid JSON. 
 Supported intents:
-- create_event
-- delete_event
-- reschedule_event
-- query_events
+- create_event: For new events.
+- delete_event: For removing existing events.
+- reschedule_event: For moving an existing event to a NEW date or time.
+- query_events: For searching/showing events.
 
 RULES:
-- The event_name is the main subject/activity.
-- Never omit the event_name.
-- Always extract an event_name.
-- Return ONLY JSON.
-- For query_events, extract ONLY the core search keyword (e.g. "assignments") as the event_name, omitting filler words like "all" or "show".
-- The date field should contain only the date part if possible (e.g. "tomorrow", "Oct 12").
-- The time field should contain only the time part if possible (e.g. "5pm", "14:00").
+- If the user uses words like "move", "change", "shift", or "reschedule", use reschedule_event.
+- For reschedule_event, the "date" and "time" fields should contain the NEW destination date/time.
+- For query_events, extract the search term into "event_name".
 
 Examples:
-
-User:
-"create assignment tomorrow"
-
-Output:
-{
-  "intent": "create_event",
-  "event_name": "assignment",
-  "date": "tomorrow",
-  "time": null
-}
-
-User:
-"create math assignment tomorrow at 8am"
-
-Output:
-{
-  "intent": "create_event",
-  "event_name": "math assignment",
-  "date": "tomorrow",
-  "time": "8am"
-}
-
-User:
-"create dentist appointment friday 5pm"
-
-Output:
-{
-  "intent": "create_event",
-  "event_name": "dentist appointment",
-  "date": "friday",
-  "time": "5pm"
-}
-
-The JSON object should have the following structure:
-{
-  "intent": "intent_name",
-  "event_name": "extracted name of the event if applicable",
-  "date": "extracted date text if applicable (e.g. tomorrow, next monday, Oct 12)",
-  "time": "extracted time text if applicable (e.g. 5pm, 14:00)",
-  "additional_info": "any other details"
-}
+"reschedule my meeting to tomorrow 5pm" -> {"intent": "reschedule_event", "event_name": "meeting", "date": "tomorrow", "time": "5pm"}
+"move the test to friday" -> {"intent": "reschedule_event", "event_name": "test", "date": "friday"}
+"delete my appointment" -> {"intent": "delete_event", "event_name": "appointment"}
+"show all my assignments" -> {"intent": "query_events", "event_name": "assignments"}
 
 Transcript: "${transcript}"
 `;
 
-    const response = await fetch("http://localhost:11434/api/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "phi3",
-        prompt: prompt,
-        stream: false,
-        format: "json",
-      }),
-    });
+    const apiKey = process.env.GEMINI_API_KEY;
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            responseMimeType: "application/json",
+          },
+        }),
+      }
+    );
 
     if (!response.ok) {
-      throw new Error(`Ollama API error: ${response.statusText}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(`Gemini API error: ${response.statusText} ${JSON.stringify(errorData)}`);
     }
 
     const data = await response.json();
-    let jsonStr = data.response;
+    let jsonStr = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
 
     // Fallback: simple extraction if Ollama wraps in markdown block despite instructions
     if (jsonStr.includes("```")) {
