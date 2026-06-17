@@ -176,3 +176,22 @@ export async function updateVaultItem(formData: FormData) {
     return { error: err.message || 'Internal Server Error' }
   }
 }
+
+export async function deleteVaultItem(id: string) {
+  try {
+    const supabase = await getSupabase()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'Unauthorized' }
+
+    const { error } = await supabase
+      .from('vault_items')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id)
+
+    if (error) return { error: error.message }
+    return { success: true }
+  } catch (err: any) {
+    return { error: err.message || 'Internal Server Error' }
+  }
+}

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import CryptoJS from "crypto-js";
-import { getVaultItems, createVaultItem, updateVaultItem } from "../actions";
+import { getVaultItems, createVaultItem, updateVaultItem, deleteVaultItem } from "../actions";
 
 interface VaultItem {
   id: string;
@@ -34,6 +34,8 @@ export default function VaultDashboard() {
   const [showCreatePassword, setShowCreatePassword] = useState(false);
   const [showPromptPassword, setShowPromptPassword] = useState(false);
   const [showEditPassword, setShowEditPassword] = useState(false);
+
+  const [itemToDelete, setItemToDelete] = useState<VaultItem | null>(null);
 
   const ENCRYPTION_KEY = process.env.NEXT_PUBLIC_ITEM_ENCRYPTION_KEY || "fallback_item_key";
 
@@ -192,6 +194,19 @@ export default function VaultDashboard() {
     }
   }
 
+  async function confirmDelete() {
+    if (!itemToDelete) return;
+    setLoading(true);
+    const res = await deleteVaultItem(itemToDelete.id);
+    if (res.error) {
+      alert("Failed to delete: " + res.error);
+      setLoading(false);
+    } else {
+      setItemToDelete(null);
+      loadItems();
+    }
+  }
+
   return (
     <div className="min-h-screen bg-[#E4DDD3] p-8">
       <header className="flex justify-between items-center mb-10 max-w-6xl mx-auto">
@@ -242,22 +257,36 @@ export default function VaultDashboard() {
                   </div>
                 )}
                 
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (item.requires_item_password) {
-                      setPasswordPromptItem({ item, action: "edit" });
-                      setPromptError(null);
-                    } else {
-                      openEdit(item);
-                    }
-                  }}
-                  className="absolute top-4 right-4 p-2 text-[#17211F]/30 hover:text-[#00A19B] opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 rounded-full"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
-                    <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/>
-                  </svg>
-                </button>
+                <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (item.requires_item_password) {
+                        setPasswordPromptItem({ item, action: "edit" });
+                        setPromptError(null);
+                      } else {
+                        openEdit(item);
+                      }
+                    }}
+                    className="p-2 text-[#17211F]/30 hover:text-[#00A19B] bg-white/80 rounded-full shadow-sm"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                      <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/>
+                    </svg>
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setItemToDelete(item);
+                    }}
+                    className="p-2 text-[#17211F]/30 hover:text-red-500 bg-white/80 rounded-full shadow-sm"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                      <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                      <path fillRule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                    </svg>
+                  </button>
+                </div>
 
                 <h2 className="text-xl font-bold text-[#17211F] mt-4 line-clamp-2">{item.title}</h2>
                 <div className="text-right text-xs font-bold text-[#17211F]/40 mt-auto">
@@ -387,6 +416,31 @@ export default function VaultDashboard() {
                 <button disabled={editFormLoading} type="submit" className="flex-1 bg-[#00A19B] text-white font-bold py-3 rounded-xl shadow-[0_8px_20px_rgba(0,161,155,0.28)] hover:-translate-y-0.5 transition disabled:opacity-50">Save Changes</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {itemToDelete && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl relative text-center">
+            <button onClick={() => setItemToDelete(null)} className="absolute top-4 right-4 text-gray-400 hover:text-black">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg>
+            </button>
+            <div className="flex justify-center mb-4">
+              <div className="w-14 h-14 bg-red-100 text-red-500 rounded-full flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
+                  <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                  <path fillRule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                </svg>
+              </div>
+            </div>
+            <h2 className="text-xl font-bold text-[#17211F] mb-2">Delete Locker?</h2>
+            <p className="text-sm font-medium text-[#17211F]/60 mb-6">Are you sure you want to delete this locker? This action cannot be undone.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setItemToDelete(null)} className="flex-1 py-3 font-bold text-[#17211F]/60 hover:bg-gray-100 rounded-xl transition">Cancel</button>
+              <button onClick={confirmDelete} className="flex-1 bg-red-500 text-white font-bold py-3 rounded-xl shadow-[0_8px_20px_rgba(239,68,68,0.28)] hover:-translate-y-0.5 transition">Delete</button>
+            </div>
           </div>
         </div>
       )}
