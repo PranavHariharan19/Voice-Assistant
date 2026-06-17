@@ -1013,15 +1013,28 @@ export default function Home() {
           <path d="M3.5 6.5A.5.5 0 0 1 4 7v1a4 4 0 0 0 8 0V7a.5.5 0 0 1 1 0v1a5 5 0 0 1-4.5 4.975V15h3a.5.5 0 0 1 0 1h-7a.5.5 0 0 1 0-1h3v-2.025A5 5 0 0 1 3 8V7a.5.5 0 0 1 .5-.5"/>
         </svg>
       </button>
+      <button
+        type="button"
+        onClick={() => router.push('/vault')}
+        className="flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-full shadow-sm transition-all bg-[#17211f] text-[#E4DDD3] hover:bg-[#17211f]/80"
+        title="Vault"
+        aria-label="Vault"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+          <path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2zm3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2zM5 8h6a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/>
+        </svg>
+      </button>
     </div>
   );
 
-  if (authLoading) {
+  if (authLoading || !user) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-[#E4DDD3]">
         <div className="flex flex-col items-center gap-4">
           <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#00A19B] border-t-transparent"></div>
-          <p className="font-bold text-[#17211F]/60">Syncing your calendar...</p>
+          <p className="font-bold text-[#17211F]/60">
+            {authLoading ? "Syncing your calendar..." : "Redirecting to login..."}
+          </p>
         </div>
       </div>
     );
