@@ -41,6 +41,9 @@ export default function VaultDashboard() {
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [showBackupConfirm, setShowBackupConfirm] = useState(false);
 
+  const [restoreErrors, setRestoreErrors] = useState<string[]>([]);
+  const [isRestoring, setIsRestoring] = useState(false);
+
   const ENCRYPTION_KEY = process.env.NEXT_PUBLIC_ITEM_ENCRYPTION_KEY || "fallback_item_key";
 
   useEffect(() => {
@@ -241,6 +244,59 @@ export default function VaultDashboard() {
     setSelectedItems(new Set());
   }
 
+  async function handleRestore(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    setIsRestoring(true);
+    setRestoreErrors([]);
+    const errors: string[] = [];
+
+    for (const file of files) {
+      try {
+        const text = await file.text();
+        const lines = text.split('\n');
+        
+        if (lines.length < 3 || !lines[0].startsWith('Locker: ') || !lines[1].startsWith('Created: ')) {
+          errors.push(`'${file.name}' is incompatible. (Missing Locker/Created headers)`);
+          continue;
+        }
+
+        const title = lines[0].replace('Locker: ', '').trim();
+        const content = lines.slice(3).join('\n').trim();
+
+        if (!title || !content) {
+          errors.push(`'${file.name}' is incompatible. (Empty title or content)`);
+          continue;
+        }
+
+        const encryptedContent = CryptoJS.AES.encrypt(content, ENCRYPTION_KEY).toString();
+
+        const newFormData = new FormData();
+        newFormData.append("title", title);
+        newFormData.append("content", encryptedContent);
+        newFormData.append("requires_item_password", "false");
+
+        const res = await createVaultItem(newFormData);
+        if (res.error) {
+          errors.push(`'${file.name}': Server error - ${res.error}`);
+        }
+      } catch (err) {
+        errors.push(`'${file.name}': Failed to read file`);
+      }
+    }
+
+    if (errors.length > 0) {
+      setRestoreErrors(errors);
+    }
+    
+    // Clear input
+    e.target.value = '';
+    
+    await loadItems();
+    setIsRestoring(false);
+  }
+
   return (
     <div className="min-h-screen bg-[#E4DDD3] p-8">
       <header className="flex justify-between items-center mb-10 max-w-6xl mx-auto">
@@ -265,6 +321,17 @@ export default function VaultDashboard() {
               </button>
             </>
           )}
+          <label className={`cursor-pointer px-6 py-2 rounded-full font-bold shadow-[0_8px_20px_rgba(0,161,155,0.28)] hover:-translate-y-0.5 transition flex items-center justify-center ${isRestoring ? 'bg-[#00A19B]/50 text-white pointer-events-none' : 'bg-[#00A19B] text-white'}`}>
+            {isRestoring ? 'Restoring...' : 'Restore'}
+            <input 
+              type="file" 
+              accept=".txt" 
+              multiple 
+              className="hidden" 
+              onChange={handleRestore}
+              disabled={isRestoring}
+            />
+          </label>
           <Link href="/" className="text-[#17211F]/60 font-bold hover:text-[#00A19B] transition">
             Exit Vault
           </Link>
@@ -563,6 +630,31 @@ export default function VaultDashboard() {
               <button onClick={() => setItemToDelete(null)} className="flex-1 py-3 font-bold text-[#17211F]/60 hover:bg-gray-100 rounded-xl transition">Cancel</button>
               <button onClick={confirmDelete} className="flex-1 bg-red-500 text-white font-bold py-3 rounded-xl shadow-[0_8px_20px_rgba(239,68,68,0.28)] hover:-translate-y-0.5 transition">Delete</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Restore Errors Modal */}
+      {restoreErrors.length > 0 && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-8 w-full max-w-lg shadow-2xl relative">
+            <button onClick={() => setRestoreErrors([])} className="absolute top-4 right-4 text-gray-400 hover:text-black">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg>
+            </button>
+            <div className="flex justify-center mb-4">
+              <div className="w-12 h-12 bg-red-100 text-red-500 rounded-full flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                  <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>
+                </svg>
+              </div>
+            </div>
+            <h2 className="text-xl font-bold text-center text-[#17211F] mb-6">Restore Issues</h2>
+            <ul className="text-sm text-gray-700 space-y-2 max-h-64 overflow-y-auto bg-red-50 p-4 rounded-xl border border-red-100 font-medium">
+              {restoreErrors.map((err, i) => (
+                <li key={i}>• {err}</li>
+              ))}
+            </ul>
+            <button onClick={() => setRestoreErrors([])} className="w-full mt-6 bg-[#17211F] text-white font-bold py-3 rounded-xl hover:-translate-y-0.5 transition">Dismiss</button>
           </div>
         </div>
       )}
