@@ -37,6 +37,10 @@ export default function VaultDashboard() {
 
   const [itemToDelete, setItemToDelete] = useState<VaultItem | null>(null);
 
+  const [isBackupMode, setIsBackupMode] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [showBackupConfirm, setShowBackupConfirm] = useState(false);
+
   const ENCRYPTION_KEY = process.env.NEXT_PUBLIC_ITEM_ENCRYPTION_KEY || "fallback_item_key";
 
   useEffect(() => {
@@ -207,18 +211,59 @@ export default function VaultDashboard() {
     }
   }
 
+  function executeBackup() {
+    const itemsToExport = items.filter(i => selectedItems.has(i.id));
+    
+    itemsToExport.forEach((item, index) => {
+      setTimeout(() => {
+        try {
+          const bytes = CryptoJS.AES.decrypt(item.content, ENCRYPTION_KEY);
+          const originalText = bytes.toString(CryptoJS.enc.Utf8);
+          
+          const fileContent = `Locker: ${item.title}\nCreated: ${new Date(item.created_at).toLocaleString()}\n\n${originalText || "Failed to decrypt content"}`;
+          
+          const blob = new Blob([fileContent], { type: "text/plain" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `${item.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_backup.txt`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        } catch (e) {
+          console.error("Backup decryption failed for item:", item.title);
+        }
+      }, index * 200); // slight delay to prevent browser blocking multiple downloads
+    });
+
+    setIsBackupMode(false);
+    setSelectedItems(new Set());
+  }
+
   return (
     <div className="min-h-screen bg-[#E4DDD3] p-8">
       <header className="flex justify-between items-center mb-10 max-w-6xl mx-auto">
         <h1 className="text-3xl font-bold text-[#17211F]">Vault Dashboard</h1>
         <div className="flex items-center gap-4">
           {items.length > 0 && (
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="bg-[#00A19B] text-white px-6 py-2 rounded-full font-bold shadow-[0_8px_20px_rgba(0,161,155,0.28)] hover:-translate-y-0.5 transition"
-            >
-              Create Locker
-            </button>
+            <>
+              <button
+                onClick={() => {
+                  setIsBackupMode(!isBackupMode);
+                  setSelectedItems(new Set());
+                }}
+                className={`px-6 py-2 rounded-full font-bold transition shadow-[0_8px_20px_rgba(0,161,155,0.28)] ${isBackupMode ? 'bg-red-500 text-white shadow-[0_8px_20px_rgba(239,68,68,0.28)]' : 'bg-[#00A19B] text-white'}`}
+              >
+                {isBackupMode ? 'Cancel Backup' : 'Backup'}
+              </button>
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="bg-[#00A19B] text-white px-6 py-2 rounded-full font-bold shadow-[0_8px_20px_rgba(0,161,155,0.28)] hover:-translate-y-0.5 transition"
+              >
+                Create Locker
+              </button>
+            </>
           )}
           <Link href="/" className="text-[#17211F]/60 font-bold hover:text-[#00A19B] transition">
             Exit Vault
@@ -242,51 +287,89 @@ export default function VaultDashboard() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-            {items.map((item) => (
-              <div
-                key={item.id}
-                onClick={() => handleCardClick(item)}
-                className="group relative bg-white/70 backdrop-blur-md border border-[#17211F]/10 rounded-2xl p-6 shadow-sm hover:shadow-lg transition cursor-pointer flex flex-col justify-between h-48"
-              >
-                {item.requires_item_password && (
-                  <div className="absolute top-4 left-4 text-[#17211F]/50">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                      <path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2zm3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/>
-                    </svg>
-                  </div>
-                )}
-                
-                <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (item.requires_item_password) {
-                        setPasswordPromptItem({ item, action: "edit" });
-                        setPromptError(null);
-                      } else {
-                        openEdit(item);
-                      }
-                    }}
-                    className="p-2 text-[#17211F]/30 hover:text-[#00A19B] bg-white/80 rounded-full shadow-sm"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
-                      <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/>
-                    </svg>
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setItemToDelete(item);
-                    }}
-                    className="p-2 text-[#17211F]/30 hover:text-red-500 bg-white/80 rounded-full shadow-sm"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
-                      <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
-                      <path fillRule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
-                    </svg>
-                  </button>
-                </div>
+          <>
+            {isBackupMode && items.length > 0 && (
+              <div className="flex items-center gap-3 mb-6 bg-white/70 backdrop-blur-md border border-[#17211F]/10 p-4 rounded-xl w-fit shadow-sm">
+                <input 
+                  type="checkbox" 
+                  checked={selectedItems.size === items.length}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSelectedItems(new Set(items.map(i => i.id)));
+                    } else {
+                      setSelectedItems(new Set());
+                    }
+                  }}
+                  className="w-5 h-5 accent-[#00A19B] rounded cursor-pointer"
+                />
+                <span className="font-bold text-[#17211F]">Select All</span>
+              </div>
+            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+              {items.map((item) => (
+                <div
+                  key={item.id}
+                  onClick={() => {
+                    if (isBackupMode) {
+                      const newSet = new Set(selectedItems);
+                      if (newSet.has(item.id)) newSet.delete(item.id);
+                      else newSet.add(item.id);
+                      setSelectedItems(newSet);
+                    } else {
+                      handleCardClick(item);
+                    }
+                  }}
+                  className={`group relative bg-white/70 backdrop-blur-md border rounded-2xl p-6 shadow-sm hover:shadow-lg transition flex flex-col justify-between h-48 cursor-pointer ${isBackupMode && selectedItems.has(item.id) ? 'border-[#00A19B] ring-2 ring-[#00A19B]/30' : 'border-[#17211F]/10'}`}
+                >
+                  {isBackupMode ? (
+                    <div className="absolute top-4 left-4 z-10">
+                      <input 
+                        type="checkbox"
+                        checked={selectedItems.has(item.id)}
+                        onChange={() => {}} 
+                        className="w-5 h-5 accent-[#00A19B] rounded cursor-pointer pointer-events-none"
+                      />
+                    </div>
+                  ) : item.requires_item_password && (
+                    <div className="absolute top-4 left-4 text-[#17211F]/50">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2zm3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/>
+                      </svg>
+                    </div>
+                  )}
+                  
+                  {!isBackupMode && (
+                    <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (item.requires_item_password) {
+                            setPasswordPromptItem({ item, action: "edit" });
+                            setPromptError(null);
+                          } else {
+                            openEdit(item);
+                          }
+                        }}
+                        className="p-2 text-[#17211F]/30 hover:text-[#00A19B] bg-white/80 rounded-full shadow-sm"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                          <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/>
+                        </svg>
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setItemToDelete(item);
+                        }}
+                        className="p-2 text-[#17211F]/30 hover:text-red-500 bg-white/80 rounded-full shadow-sm"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                          <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                          <path fillRule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                        </svg>
+                      </button>
+                    </div>
+                  )}
 
                 <h2 className="text-xl font-bold text-[#17211F] mt-4 line-clamp-2">{item.title}</h2>
                 <div className="text-right text-xs font-bold text-[#17211F]/40 mt-auto">
@@ -294,9 +377,48 @@ export default function VaultDashboard() {
                 </div>
               </div>
             ))}
-          </div>
+            </div>
+          </>
         )}
       </main>
+
+      {/* Export Action Button */}
+      {isBackupMode && selectedItems.size > 0 && (
+        <div className="fixed bottom-8 right-8 z-40">
+          <button 
+            onClick={() => setShowBackupConfirm(true)}
+            className="bg-[#00A19B] text-white px-8 py-4 rounded-full font-bold text-lg shadow-[0_12px_28px_rgba(0,161,155,0.28)] hover:-translate-y-1 transition flex items-center gap-3"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+              <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+            </svg>
+            Export {selectedItems.size} Item{selectedItems.size !== 1 ? 's' : ''}
+          </button>
+        </div>
+      )}
+
+      {/* Backup Confirmation Modal */}
+      {showBackupConfirm && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl relative text-center">
+            <h2 className="text-xl font-bold text-[#17211F] mb-2">Export Backup</h2>
+            <p className="text-sm font-medium text-[#17211F]/60 mb-6">Do you want to take a backup of {selectedItems.size} locker{selectedItems.size !== 1 ? 's' : ''}? They will be downloaded as individual text files.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setShowBackupConfirm(false)} className="flex-1 py-3 font-bold text-[#17211F]/60 hover:bg-gray-100 rounded-xl transition">Cancel</button>
+              <button 
+                onClick={() => {
+                  setShowBackupConfirm(false);
+                  executeBackup();
+                }} 
+                className="flex-1 bg-[#00A19B] text-white font-bold py-3 rounded-xl shadow-[0_8px_20px_rgba(0,161,155,0.28)] hover:-translate-y-0.5 transition"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Create Modal */}
       {showCreateModal && (
