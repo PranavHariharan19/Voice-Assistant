@@ -44,7 +44,11 @@ export default function VaultDashboard() {
   const [restoreErrors, setRestoreErrors] = useState<string[]>([]);
   const [isRestoring, setIsRestoring] = useState(false);
 
+  const [searchQuery, setSearchQuery] = useState("");
+
   const ENCRYPTION_KEY = process.env.NEXT_PUBLIC_ITEM_ENCRYPTION_KEY || "fallback_item_key";
+
+  const filteredItems = items.filter(item => item.title.toLowerCase().includes(searchQuery.toLowerCase()));
 
   useEffect(() => {
     loadItems();
@@ -338,7 +342,25 @@ export default function VaultDashboard() {
         </div>
       </header>
 
+      {items.length > 0 && (
+        <div className="max-w-6xl mx-auto mb-8">
+          <div className="relative max-w-md">
+            <input
+              type="text"
+              placeholder="Search lockers by title..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-white/70 backdrop-blur-md border border-[#17211F]/10 rounded-full px-5 py-3 pl-12 text-sm font-bold text-[#17211F] placeholder:text-[#17211F]/40 focus:outline-none focus:ring-2 focus:ring-[#00A19B]/50 shadow-sm transition"
+            />
+            <svg className="absolute left-4 top-1/2 -translate-y-1/2 text-[#17211F]/40" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
+            </svg>
+          </div>
+        </div>
+      )}
+
       <main className="max-w-6xl mx-auto relative min-h-[500px]">
+
         {loading ? (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#00A19B] border-t-transparent"></div>
@@ -355,16 +377,20 @@ export default function VaultDashboard() {
           </div>
         ) : (
           <>
-            {isBackupMode && items.length > 0 && (
+            {isBackupMode && filteredItems.length > 0 && (
               <div className="flex items-center gap-3 mb-6 bg-white/70 backdrop-blur-md border border-[#17211F]/10 p-4 rounded-xl w-fit shadow-sm">
                 <input 
                   type="checkbox" 
-                  checked={selectedItems.size === items.length}
+                  checked={selectedItems.size === filteredItems.length && filteredItems.length > 0}
                   onChange={(e) => {
                     if (e.target.checked) {
-                      setSelectedItems(new Set(items.map(i => i.id)));
+                      const newSet = new Set(selectedItems);
+                      filteredItems.forEach(i => newSet.add(i.id));
+                      setSelectedItems(newSet);
                     } else {
-                      setSelectedItems(new Set());
+                      const newSet = new Set(selectedItems);
+                      filteredItems.forEach(i => newSet.delete(i.id));
+                      setSelectedItems(newSet);
                     }
                   }}
                   className="w-5 h-5 accent-[#00A19B] rounded cursor-pointer"
@@ -372,9 +398,14 @@ export default function VaultDashboard() {
                 <span className="font-bold text-[#17211F]">Select All</span>
               </div>
             )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-              {items.map((item) => (
-                <div
+            {filteredItems.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 text-[#17211F]/60 font-medium">
+                No lockers found matching "{searchQuery}"
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                {filteredItems.map((item) => (
+                  <div
                   key={item.id}
                   onClick={() => {
                     if (isBackupMode) {
@@ -444,7 +475,8 @@ export default function VaultDashboard() {
                 </div>
               </div>
             ))}
-            </div>
+              </div>
+            )}
           </>
         )}
       </main>
