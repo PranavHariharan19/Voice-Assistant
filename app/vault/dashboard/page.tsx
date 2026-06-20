@@ -238,7 +238,7 @@ export default function VaultDashboard() {
           a.click();
           document.body.removeChild(a);
           URL.revokeObjectURL(url);
-        } catch (e) {
+        } catch {
           console.error("Backup decryption failed for item:", item.title);
         }
       }, index * 200); // slight delay to prevent browser blocking multiple downloads
@@ -285,7 +285,7 @@ export default function VaultDashboard() {
         if (res.error) {
           errors.push(`'${file.name}': Server error - ${res.error}`);
         }
-      } catch (err) {
+      } catch {
         errors.push(`'${file.name}': Failed to read file`);
       }
     }
@@ -400,7 +400,7 @@ export default function VaultDashboard() {
             )}
             {filteredItems.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-[#17211F]/60 font-medium">
-                No lockers found matching "{searchQuery}"
+                No lockers found matching &quot;{searchQuery}&quot;
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
