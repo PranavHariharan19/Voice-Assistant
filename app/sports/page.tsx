@@ -31,7 +31,7 @@ type FavoriteEntity = {
 
 const SPORTS_FILTERS = ["all", "football", "cricket", "f1", "kabaddi"];
 
-function SortableItem({ entity }: { entity: FavoriteEntity }) {
+function SortableItem({ entity, onClick, isSelected }: { entity: FavoriteEntity; onClick: () => void; isSelected: boolean }) {
   const {
     attributes,
     listeners,
@@ -53,11 +53,12 @@ function SortableItem({ entity }: { entity: FavoriteEntity }) {
       style={style}
       {...attributes}
       {...listeners}
-      className={`group relative overflow-hidden rounded-2xl bg-white/70 p-6 shadow-sm border border-white cursor-grab active:cursor-grabbing ${
-        isDragging
-          ? "shadow-2xl ring-2 ring-[#00A19B] opacity-80"
-          : "hover:-translate-y-1 hover:bg-white hover:shadow-xl hover:shadow-[#00A19B]/10 transition-colors transition-shadow"
-      }`}
+      className={`group relative overflow-hidden rounded-2xl p-6 cursor-grab active:cursor-grabbing transition-all duration-300 ${
+        isSelected
+          ? "border-2 border-[#00A19B] bg-[#00A19B]/10 shadow-lg shadow-[#00A19B]/20 scale-[1.02]"
+          : "bg-white/70 border border-white shadow-sm hover:-translate-y-1 hover:bg-white hover:shadow-xl hover:shadow-[#00A19B]/10"
+      } ${isDragging ? "shadow-2xl ring-2 ring-[#00A19B] opacity-80 z-50" : ""}`}
+      onClick={onClick}
     >
       <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-gradient-to-br from-[#00A19B]/20 to-transparent blur-2xl transition-transform duration-500 group-hover:scale-150"></div>
 
@@ -92,6 +93,11 @@ export default function SportsPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedEntity, setSelectedEntity] = useState<FavoriteEntity | null>(null);
+  type ScheduleItem = { id?: string; title?: string; date?: string; time?: string; venue?: string };
+  const [scheduleData, setScheduleData] = useState<ScheduleItem[]>([]);
+  const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -117,7 +123,7 @@ export default function SportsPage() {
     async function loadEntities() {
       const { data, error } = await supabase
         .from("favorite_entities")
-        .select("user_id, sport, entity_name")
+        .select("id, user_id, sport, entity_name")
         .eq("user_id", user?.id);
 
       if (!isMounted) return;
@@ -127,8 +133,28 @@ export default function SportsPage() {
       } else {
         const withIds = (data || []).map((item) => ({
           ...item,
-          id: `${item.sport}-${item.entity_name}`,
+          // Use the real uuid for DB operations, keeping string id for DnD if needed or just use real id.
+          // Wait, DndKit needs a string id. The real id is a UUID string.
+          id: item.id,
         }));
+        
+        try {
+          const savedOrderStr = localStorage.getItem("favoriteTeamsOrder");
+          if (savedOrderStr) {
+            const savedOrder = JSON.parse(savedOrderStr);
+            withIds.sort((a, b) => {
+              const indexA = savedOrder.indexOf(a.id);
+              const indexB = savedOrder.indexOf(b.id);
+              if (indexA === -1 && indexB === -1) return 0;
+              if (indexA === -1) return 1;
+              if (indexB === -1) return -1;
+              return indexA - indexB;
+            });
+          }
+        } catch(e) {
+          console.error("Error reading order from localStorage", e);
+        }
+
         setEntities(withIds);
       }
       setLoading(false);
@@ -139,6 +165,47 @@ export default function SportsPage() {
       isMounted = false;
     };
   }, [user]);
+
+  useEffect(() => {
+    if (!selectedEntity) return;
+
+    let isMounted = true;
+    setScheduleLoading(true);
+    setScheduleError(null);
+
+    async function loadSchedule() {
+      try {
+        const res = await fetch(`/api/sports/schedule?entityId=${selectedEntity?.id}`);
+        if (!res.ok) {
+          throw new Error("Failed to load schedule");
+        }
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+
+        if (isMounted) {
+          setScheduleData(data.schedule || []);
+        }
+      } catch (e: unknown) {
+        if (isMounted) {
+          if (e instanceof Error) {
+            setScheduleError(e.message);
+          } else {
+            setScheduleError("An error occurred");
+          }
+        }
+      } finally {
+        if (isMounted) {
+          setScheduleLoading(false);
+        }
+      }
+    }
+
+    loadSchedule();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedEntity]);
 
   const filteredEntities = entities.filter((entity) => {
     const matchesFilter = filter === "all" || entity.sport.toLowerCase() === filter;
@@ -154,7 +221,13 @@ export default function SportsPage() {
         const oldIndex = items.findIndex((i) => i.id === active.id);
         const newIndex = items.findIndex((i) => i.id === over.id);
 
-        return arrayMove(items, oldIndex, newIndex);
+        const newArray = arrayMove(items, oldIndex, newIndex);
+        try {
+          localStorage.setItem("favoriteTeamsOrder", JSON.stringify(newArray.map(item => item.id)));
+        } catch(e) {
+          console.error("Error saving order to localStorage", e);
+        }
+        return newArray;
       });
     }
   }
@@ -168,6 +241,18 @@ export default function SportsPage() {
         </div>
       </div>
     );
+  }
+
+  function isThisWeek(dateStr: string | undefined) {
+    if (!dateStr) return false;
+    const parts = dateStr.split('/');
+    if (parts.length !== 3) return false;
+    const matchDate = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diffTime = matchDate.getTime() - today.getTime();
+    const diffDays = diffTime / (1000 * 60 * 60 * 24);
+    return diffDays >= 0 && diffDays <= 7;
   }
 
   return (
@@ -188,7 +273,7 @@ export default function SportsPage() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-6xl px-6 py-8">
+      <div className="mx-auto w-full max-w-[1600px] px-6 py-8">
         {/* Search and Filters */}
         <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           {/* Filters */}
@@ -246,15 +331,83 @@ export default function SportsPage() {
             </p>
           </div>
         ) : (
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext items={filteredEntities.map((e) => e.id)} strategy={rectSortingStrategy}>
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {filteredEntities.map((entity) => (
-                  <SortableItem key={entity.id} entity={entity} />
-                ))}
+          <div className="flex justify-between gap-8 items-start h-full pb-10">
+            <div className={`flex-1 transition-all duration-500 ${selectedEntity ? 'max-w-[55%]' : 'w-full'}`}>
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={filteredEntities.map((e) => e.id)} strategy={rectSortingStrategy}>
+                  <div className={`grid grid-cols-1 gap-6 ${selectedEntity ? 'sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3' : 'sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}`}>
+                    {filteredEntities.map((entity) => (
+                      <SortableItem 
+                        key={entity.id} 
+                        entity={entity} 
+                        isSelected={selectedEntity?.id === entity.id}
+                        onClick={() => setSelectedEntity(entity)} 
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
+            </div>
+            
+            {/* Right Side Window for Schedules */}
+            {selectedEntity && (
+              <div className="w-[40%] sticky top-24 bg-white/80 backdrop-blur-xl border border-white rounded-3xl p-6 shadow-xl shadow-[#00A19B]/5 h-[calc(100vh-140px)] overflow-hidden hidden md:flex flex-col animate-in fade-in slide-in-from-right-8 duration-300">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-2xl font-bold text-[#17211f]">Upcoming Schedule</h2>
+                  </div>
+                  <button onClick={() => setSelectedEntity(null)} className="h-8 w-8 flex items-center justify-center rounded-full bg-[#17211f]/5 hover:bg-[#17211f]/10 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                      <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
+                    </svg>
+                  </button>
+                </div>
+                
+                <div className="flex-1 flex flex-col gap-4 overflow-y-auto pr-2">
+                  {scheduleLoading ? (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#00A19B] border-t-transparent"></div>
+                    </div>
+                  ) : scheduleError ? (
+                    <div className="flex-1 flex flex-col items-center justify-center text-center p-6 bg-red-50 rounded-2xl">
+                      <p className="text-red-600 font-medium">{scheduleError}</p>
+                    </div>
+                  ) : scheduleData && scheduleData.length > 0 ? (
+                    scheduleData.map((match, i) => (
+                      <div key={match.id || i} className="relative bg-white rounded-2xl p-5 shadow-sm border border-[#17211f]/5 hover:shadow-md transition-shadow">
+                        <div className="flex items-start justify-between gap-4 mb-3">
+                          <h4 className="font-bold text-[#17211f] pr-16">{match.title}</h4>
+                          {isThisWeek(match.date) && (
+                            <span className="absolute top-4 right-4 inline-flex items-center rounded-full bg-[#00A19B]/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#00A19B]">
+                              This week
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-[#17211f]/60 mb-2">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5M1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4z"/>
+                          </svg>
+                          <span>{match.date} at {match.time}</span>
+                        </div>
+                        {match.venue && (
+                          <div className="flex items-center gap-2 text-sm text-[#17211f]/60">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                              <path d="M8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10m0-7a3 3 0 1 1 0-6 3 3 0 0 1 0 6"/>
+                            </svg>
+                            <span>{match.venue}</span>
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="flex-1 flex flex-col items-center justify-center text-center p-6 bg-white/50 rounded-2xl">
+                      <p className="text-[#17211f]/60">No upcoming schedule found.</p>
+                    </div>
+                  )}
+                </div>
               </div>
-            </SortableContext>
-          </DndContext>
+            )}
+          </div>
         )}
       </div>
     </main>
