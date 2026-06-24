@@ -98,6 +98,12 @@ export default function SportsPage() {
   const [scheduleData, setScheduleData] = useState<ScheduleItem[]>([]);
   const [scheduleLoading, setScheduleLoading] = useState(false);
   const [scheduleError, setScheduleError] = useState<string | null>(null);
+  const [iccGender, setIccGender] = useState<'men' | 'women'>('men');
+  const [timeFilter, setTimeFilter] = useState<'all' | 'today' | 'this_week'>('all');
+  const [isAddMode, setIsAddMode] = useState(false);
+  const [selectedMatches, setSelectedMatches] = useState<Set<string>>(new Set());
+  const [showPopup, setShowPopup] = useState(false);
+  const [isAdding, setIsAdding] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -112,7 +118,7 @@ export default function SportsPage() {
 
   useEffect(() => {
     if (initialized && !user) {
-      router.push("/login");
+      router.push("/");
     }
   }, [user, initialized, router]);
 
@@ -170,8 +176,12 @@ export default function SportsPage() {
     if (!selectedEntity) return;
 
     let isMounted = true;
-    setScheduleLoading(true);
-    setScheduleError(null);
+    setTimeout(() => {
+      if (isMounted) {
+        setScheduleLoading(true);
+        setScheduleError(null);
+      }
+    }, 0);
 
     async function loadSchedule() {
       try {
@@ -255,13 +265,115 @@ export default function SportsPage() {
     return diffDays >= 0 && diffDays <= 7;
   }
 
+  function isToday(dateStr: string | undefined) {
+    if (!dateStr) return false;
+    const parts = dateStr.split('/');
+    if (parts.length !== 3) return false;
+    const matchDate = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diffTime = matchDate.getTime() - today.getTime();
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays === 0;
+  }
+
+  function parseDateTime(dateStr: string | undefined, timeStr: string | undefined): Date {
+    if (!dateStr) return new Date(9999, 11, 31);
+    const parts = dateStr.split('/');
+    if (parts.length !== 3) return new Date(9999, 11, 31);
+    
+    let hours = 0;
+    let minutes = 0;
+    
+    if (timeStr) {
+      const timeMatch = timeStr.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+      if (timeMatch) {
+        hours = parseInt(timeMatch[1], 10);
+        minutes = parseInt(timeMatch[2], 10);
+        if (timeMatch[3]) {
+          const isPM = timeMatch[3].toUpperCase() === 'PM';
+          if (isPM && hours < 12) hours += 12;
+          if (!isPM && hours === 12) hours = 0;
+        }
+      }
+    }
+
+    return new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]), hours, minutes);
+  }
+
+  let filteredSchedule = scheduleData || [];
+  if (selectedEntity?.entity_name.toLowerCase() === 'icc') {
+    filteredSchedule = filteredSchedule.filter((match: any) => {
+      const isWomen = match.title.toLowerCase().includes('women');
+      return iccGender === 'women' ? isWomen : !isWomen;
+    });
+  }
+
+  if (timeFilter === 'today') {
+    filteredSchedule = filteredSchedule.filter(match => isToday(match.date));
+  } else if (timeFilter === 'this_week') {
+    filteredSchedule = filteredSchedule.filter(match => isThisWeek(match.date));
+  }
+
+  filteredSchedule.sort((a, b) => {
+    return parseDateTime(a.date, a.time).getTime() - parseDateTime(b.date, b.time).getTime();
+  });
+
+  async function handleAddModeToggle() {
+    if (!isAddMode) {
+      setIsAddMode(true);
+      setSelectedMatches(new Set());
+    } else {
+      if (selectedMatches.size > 0) {
+        setIsAdding(true);
+        const matchesToAdd = filteredSchedule.filter((m: any) => selectedMatches.has(m.id || m.title));
+        
+        const payloads = matchesToAdd.map((match: any) => {
+          const parsed = parseDateTime(match.date, match.time);
+          const dKey = `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
+          
+          let tStr = null;
+          if (match.time) {
+             tStr = `${String(parsed.getHours()).padStart(2, '0')}:${String(parsed.getMinutes()).padStart(2, '0')}`;
+          }
+          
+          return {
+             event_name: match.title,
+             event_date: dKey,
+             event_time: tStr,
+             additional_info: match.venue || "",
+             user_id: user?.id
+          };
+        });
+        
+        if (payloads.length > 0) {
+          await supabase.from("events").insert(payloads);
+        }
+        
+        setShowPopup(true);
+        setTimeout(() => setShowPopup(false), 3000);
+        setIsAdding(false);
+      }
+      setIsAddMode(false);
+      setSelectedMatches(new Set());
+    }
+  }
+
+  function handleSelectAll() {
+    if (selectedMatches.size === filteredSchedule.length) {
+      setSelectedMatches(new Set());
+    } else {
+      setSelectedMatches(new Set(filteredSchedule.map(m => String(m.id || m.title))));
+    }
+  }
+
   return (
     <main className="min-h-screen bg-[#E4DDD3] text-[#17211f]">
       {/* Header */}
       <header className="sticky top-0 z-10 flex items-center justify-between bg-[#E4DDD3]/80 px-6 py-4 backdrop-blur-md border-b border-[#17211f]/5">
         <div className="flex items-center gap-4">
           <button
-            onClick={() => router.push("/")}
+            onClick={() => router.push("/calendar")}
             className="flex h-10 w-10 items-center justify-center rounded-full bg-white/50 text-[#17211f] shadow-sm transition-all hover:bg-white"
             aria-label="Go back"
           >
@@ -352,64 +464,152 @@ export default function SportsPage() {
             {/* Right Side Window for Schedules */}
             {selectedEntity && (
               <div className="w-[40%] sticky top-24 bg-white/80 backdrop-blur-xl border border-white rounded-3xl p-6 shadow-xl shadow-[#00A19B]/5 h-[calc(100vh-140px)] overflow-hidden hidden md:flex flex-col animate-in fade-in slide-in-from-right-8 duration-300">
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex items-start justify-between mb-6">
                   <div>
                     <h2 className="text-2xl font-bold text-[#17211f]">Upcoming Schedule</h2>
+                    {selectedEntity.entity_name.toLowerCase() === 'icc' && (
+                       <div className="flex items-center gap-2 mt-3 bg-[#17211f]/5 p-1 rounded-lg w-fit">
+                         <button 
+                           onClick={() => setIccGender('men')}
+                           className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-all ${iccGender === 'men' ? 'bg-white text-[#00A19B] shadow-sm' : 'text-[#17211f]/60 hover:text-[#17211f]'}`}
+                         >
+                           Men
+                         </button>
+                         <button 
+                           onClick={() => setIccGender('women')}
+                           className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-all ${iccGender === 'women' ? 'bg-white text-[#00A19B] shadow-sm' : 'text-[#17211f]/60 hover:text-[#17211f]'}`}
+                         >
+                           Women
+                         </button>
+                       </div>
+                    )}
+                    {isAddMode && filteredSchedule.length > 0 && (
+                       <label className="flex items-center gap-2 mt-3 text-sm font-medium text-[#17211f]/80 cursor-pointer">
+                         <input 
+                           type="checkbox" 
+                           checked={selectedMatches.size === filteredSchedule.length}
+                           onChange={handleSelectAll}
+                           className="w-4 h-4 rounded border-[#17211f]/20 text-[#00A19B] focus:ring-[#00A19B]"
+                         />
+                         Select All
+                       </label>
+                    )}
                   </div>
-                  <button onClick={() => setSelectedEntity(null)} className="h-8 w-8 flex items-center justify-center rounded-full bg-[#17211f]/5 hover:bg-[#17211f]/10 transition-colors">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                      <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
-                    </svg>
-                  </button>
+                  <div className="flex flex-col items-end gap-3">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleAddModeToggle}
+                        disabled={isAdding}
+                        className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${isAddMode ? 'bg-[#00A19B] text-white shadow-sm' : 'bg-[#17211f]/5 text-[#17211f]/60 hover:bg-[#17211f]/10 hover:text-[#17211f]'} ${isAdding ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        {isAdding ? 'Adding...' : isAddMode ? 'Save to Calendar' : 'Add to Calendar'}
+                      </button>
+                      <button onClick={() => setSelectedEntity(null)} className="h-8 w-8 flex items-center justify-center rounded-full bg-[#17211f]/5 hover:bg-[#17211f]/10 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                          <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
+                        </svg>
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-1 bg-[#17211f]/5 p-1 rounded-lg">
+                      <button
+                        onClick={() => setTimeFilter(timeFilter === 'today' ? 'all' : 'today')}
+                        className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${timeFilter === 'today' ? 'bg-white text-[#00A19B] shadow-sm' : 'text-[#17211f]/60 hover:text-[#17211f]'}`}
+                      >
+                        Today
+                      </button>
+                      <button
+                        onClick={() => setTimeFilter(timeFilter === 'this_week' ? 'all' : 'this_week')}
+                        className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${timeFilter === 'this_week' ? 'bg-white text-[#00A19B] shadow-sm' : 'text-[#17211f]/60 hover:text-[#17211f]'}`}
+                      >
+                        This Week
+                      </button>
+                    </div>
+                  </div>
                 </div>
                 
                 <div className="flex-1 flex flex-col gap-4 overflow-y-auto pr-2">
-                  {scheduleLoading ? (
-                    <div className="flex-1 flex items-center justify-center">
-                      <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#00A19B] border-t-transparent"></div>
-                    </div>
-                  ) : scheduleError ? (
-                    <div className="flex-1 flex flex-col items-center justify-center text-center p-6 bg-red-50 rounded-2xl">
-                      <p className="text-red-600 font-medium">{scheduleError}</p>
-                    </div>
-                  ) : scheduleData && scheduleData.length > 0 ? (
-                    scheduleData.map((match, i) => (
-                      <div key={match.id || i} className="relative bg-white rounded-2xl p-5 shadow-sm border border-[#17211f]/5 hover:shadow-md transition-shadow">
-                        <div className="flex items-start justify-between gap-4 mb-3">
-                          <h4 className="font-bold text-[#17211f] pr-16">{match.title}</h4>
-                          {isThisWeek(match.date) && (
-                            <span className="absolute top-4 right-4 inline-flex items-center rounded-full bg-[#00A19B]/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#00A19B]">
-                              This week
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-[#17211f]/60 mb-2">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
-                            <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5M1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4z"/>
-                          </svg>
-                          <span>{match.date} at {match.time}</span>
-                        </div>
-                        {match.venue && (
-                          <div className="flex items-center gap-2 text-sm text-[#17211f]/60">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
-                              <path d="M8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10m0-7a3 3 0 1 1 0-6 3 3 0 0 1 0 6"/>
-                            </svg>
-                            <span>{match.venue}</span>
-                          </div>
-                        )}
+                  {(() => {
+                    return scheduleLoading ? (
+                      <div className="flex-1 flex items-center justify-center">
+                        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#00A19B] border-t-transparent"></div>
                       </div>
-                    ))
-                  ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center text-center p-6 bg-white/50 rounded-2xl">
-                      <p className="text-[#17211f]/60">No upcoming schedule found.</p>
-                    </div>
-                  )}
+                    ) : scheduleError ? (
+                      <div className="flex-1 flex flex-col items-center justify-center text-center p-6 bg-red-50 rounded-2xl">
+                        <p className="text-red-600 font-medium">{scheduleError}</p>
+                      </div>
+                    ) : filteredSchedule.length > 0 ? (
+                      filteredSchedule.map((match: any, i: number) => (
+                        <div key={match.id || i} onClick={() => {
+                            if (!isAddMode) return;
+                            const key = match.id || match.title;
+                            setSelectedMatches(prev => {
+                               const next = new Set(prev);
+                               if (next.has(key)) next.delete(key);
+                               else next.add(key);
+                               return next;
+                            });
+                        }} className={`relative bg-white rounded-2xl p-5 shadow-sm border ${selectedMatches.has(match.id || match.title) ? 'border-[#00A19B] bg-[#00A19B]/5' : 'border-[#17211f]/5'} hover:shadow-md transition-shadow flex items-start gap-4 ${isAddMode ? 'cursor-pointer' : ''}`}>
+                          {isAddMode && (
+                            <div className="pt-1">
+                              <input 
+                                type="checkbox"
+                                checked={selectedMatches.has(match.id || match.title)}
+                                onChange={() => {}} 
+                                className="w-5 h-5 rounded border-[#17211f]/20 text-[#00A19B] focus:ring-[#00A19B] pointer-events-none"
+                              />
+                            </div>
+                          )}
+                          <div className="flex-1">
+                            <div className="flex items-start justify-between gap-4 mb-3">
+                              <h4 className="font-bold text-[#17211f] pr-16">{match.title}</h4>
+                              {isToday(match.date) ? (
+                                <span className="absolute top-4 right-4 inline-flex items-center rounded-full bg-yellow-500/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-yellow-600">
+                                  Today
+                                </span>
+                              ) : isThisWeek(match.date) ? (
+                                <span className="absolute top-4 right-4 inline-flex items-center rounded-full bg-[#00A19B]/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#00A19B]">
+                                  This week
+                                </span>
+                              ) : null}
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-[#17211f]/60 mb-2">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5M1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4z"/>
+                              </svg>
+                              <span>{match.date} at {match.time}</span>
+                            </div>
+                            {match.venue && (
+                              <div className="flex items-center gap-2 text-sm text-[#17211f]/60">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                                  <path d="M8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10m0-7a3 3 0 1 1 0-6 3 3 0 0 1 0 6"/>
+                                </svg>
+                                <span>{match.venue}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="flex-1 flex flex-col items-center justify-center text-center p-6 bg-white/50 rounded-2xl">
+                        <p className="text-[#17211f]/60">No upcoming schedule found.</p>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             )}
           </div>
         )}
       </div>
+      
+      {showPopup && (
+        <div className="fixed bottom-6 right-6 bg-[#00A19B] text-white px-6 py-3 rounded-xl shadow-2xl z-50 animate-in slide-in-from-bottom-5 fade-in duration-300 font-semibold flex items-center gap-3">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+            <path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/>
+          </svg>
+          Matches added to calendar
+        </div>
+      )}
     </main>
   );
 }

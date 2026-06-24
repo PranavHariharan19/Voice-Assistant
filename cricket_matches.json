@@ -1,0 +1,834 @@
+[
+  {
+    "id": "7a2d8527-eba8-4ca9-9312-d94f2e9b3ce5",
+    "name": "Denmark Women vs Switzerland Women, 2nd T20I, Switzerland Women tour of Denmark, 2026",
+    "matchType": "t20",
+    "status": "Match not started",
+    "venue": "Albertslund Cricket Club, Copenhagen",
+    "date": "2026-06-27",
+    "dateTimeGMT": "2026-06-27T13:30:00",
+    "teams": [
+      "Denmark Women",
+      "Switzerland Women"
+    ],
+    "teamInfo": [
+      {
+        "name": "Denmark Women",
+        "shortname": "DW",
+        "img": "https://g.cricapi.com/iapi/599-637867438645047537.webp?w=48"
+      },
+      {
+        "name": "Switzerland Women",
+        "shortname": "SW",
+        "img": "https://h.cricapi.com/img/icon512.png"
+      }
+    ],
+    "series_id": "d11e075a-3ec6-4cdd-952e-44356a8b0ca7",
+    "fantasyEnabled": false,
+    "bbbEnabled": false,
+    "hasSquad": false,
+    "matchStarted": false,
+    "matchEnded": false
+  },
+  {
+    "id": "8e2b92ba-f002-4d5b-a0ee-19f27b7a57c2",
+    "name": "Denmark Women vs Switzerland Women, 1st T20I, Switzerland Women tour of Denmark, 2026",
+    "matchType": "t20",
+    "status": "Match not started",
+    "venue": "Albertslund Cricket Club, Copenhagen",
+    "date": "2026-06-27",
+    "dateTimeGMT": "2026-06-27T09:00:00",
+    "teams": [
+      "Denmark Women",
+      "Switzerland Women"
+    ],
+    "teamInfo": [
+      {
+        "name": "Denmark Women",
+        "shortname": "DW",
+        "img": "https://g.cricapi.com/iapi/599-637867438645047537.webp?w=48"
+      },
+      {
+        "name": "Switzerland Women",
+        "shortname": "SW",
+        "img": "https://h.cricapi.com/img/icon512.png"
+      }
+    ],
+    "series_id": "d11e075a-3ec6-4cdd-952e-44356a8b0ca7",
+    "fantasyEnabled": false,
+    "bbbEnabled": false,
+    "hasSquad": false,
+    "matchStarted": false,
+    "matchEnded": false
+  },
+  {
+    "id": "5b226fe2-7823-44b7-9e38-55d605c29389",
+    "name": "Bulgaria Women vs Serbia Women, 1st T20I, Serbia Women tour of Bulgaria, 2026",
+    "matchType": "t20",
+    "status": "Match not started",
+    "venue": "National Sports Academy, Sofia",
+    "date": "2026-06-26",
+    "dateTimeGMT": "2026-06-26T12:00:00",
+    "teams": [
+      "Bulgaria Women",
+      "Serbia Women"
+    ],
+    "teamInfo": [
+      {
+        "name": "Bulgaria Women",
+        "shortname": "BW",
+        "img": "https://h.cricapi.com/img/icon512.png"
+      },
+      {
+        "name": "Serbia Women",
+        "shortname": "SW",
+        "img": "https://g.cricapi.com/iapi/651-637876983315009937.webp?w=48"
+      }
+    ],
+    "series_id": "2def9566-fcdf-4e93-ab78-7b7edf0cea3d",
+    "fantasyEnabled": false,
+    "bbbEnabled": false,
+    "hasSquad": false,
+    "matchStarted": false,
+    "matchEnded": false
+  },
+  {
+    "id": "899844f1-9955-414c-964e-f26c85fe39d4",
+    "name": "Singapore vs Uzbekistan, 2nd Match, Asia Pacific Cricket Champions Trophy 2026",
+    "matchType": "t20",
+    "status": "Singapore won by 52 runs (8 overs game due to rain)",
+    "venue": "Singapore National Cricket Ground, Singapore",
+    "date": "2026-06-22",
+    "dateTimeGMT": "2026-06-22T10:30:00",
+    "teams": [
+      "Singapore",
+      "Uzbekistan"
+    ],
+    "teamInfo": [
+      {
+        "name": "Singapore",
+        "shortname": "SGP",
+        "img": "https://g.cricapi.com/iapi/576-637877085561587712.webp?w=48"
+      },
+      {
+        "name": "Uzbekistan",
+        "img": "https://h.cricapi.com/img/icon512.png"
+      }
+    ],
+    "score": [
+      {
+        "r": 101,
+        "w": 3,
+        "o": 8,
+        "inning": "Singapore Inning 1"
+      },
+      {
+        "r": 49,
+        "w": 5,
+        "o": 8,
+        "inning": "Uzbekistan Inning 1"
+      }
+    ],
+    "series_id": "749a5c42-1145-48fc-b16a-2f79c4af8fc1",
+    "fantasyEnabled": true,
+    "bbbEnabled": false,
+    "hasSquad": false,
+    "matchStarted": true,
+    "matchEnded": true
+  },
+  {
+    "id": "93cb9a53-d35e-4217-acde-dc8fe9ce892b",
+    "name": "Indonesia vs Thailand, 1st Match, Asia Pacific Cricket Champions Trophy 2026",
+    "matchType": "t20",
+    "status": "Match abandoned without toss",
+    "venue": "Singapore National Cricket Ground, Singapore",
+    "date": "2026-06-22",
+    "dateTimeGMT": "2026-06-22T05:30:00",
+    "teams": [
+      "Indonesia",
+      "Thailand"
+    ],
+    "teamInfo": [
+      {
+        "name": "Indonesia",
+        "shortname": "IDN",
+        "img": "https://g.cricapi.com/iapi/614-637928918114057334.png?w=48"
+      },
+      {
+        "name": "Thailand",
+        "shortname": "THAI",
+        "img": "https://g.cricapi.com/iapi/661-637873698140793668.webp?w=48"
+      }
+    ],
+    "series_id": "749a5c42-1145-48fc-b16a-2f79c4af8fc1",
+    "fantasyEnabled": false,
+    "bbbEnabled": false,
+    "hasSquad": false,
+    "matchStarted": true,
+    "matchEnded": true
+  },
+  {
+    "id": "303b5242-8e81-4e70-b6dd-946701150d2a",
+    "name": "Australia vs England, Only Test, Australia vs England, 150th Anniversary Test Match, 2027",
+    "matchType": "test",
+    "status": "Match starts at Mar 11, 03:00 GMT",
+    "venue": "Melbourne Cricket Ground, Melbourne",
+    "date": "2027-03-11",
+    "dateTimeGMT": "2027-03-11T03:00:00",
+    "teams": [
+      "Australia",
+      "England"
+    ],
+    "teamInfo": [
+      {
+        "name": "Australia",
+        "shortname": "AUS",
+        "img": "https://g.cricapi.com/iapi/6-637877070670541994.webp?w=48"
+      },
+      {
+        "name": "England",
+        "shortname": "ENG",
+        "img": "https://g.cricapi.com/iapi/23-637877072894080569.webp?w=48"
+      }
+    ],
+    "series_id": "eb59e02f-5f61-40c9-9f88-5824445e62b5",
+    "fantasyEnabled": false,
+    "bbbEnabled": false,
+    "hasSquad": false,
+    "matchStarted": false,
+    "matchEnded": false
+  },
+  {
+    "id": "9caa34e8-7a8c-450b-b9c8-f364b2564df1",
+    "name": "Denmark vs Germany, 4th T20I, Germany tour of Denmark, 2026",
+    "matchType": "t20",
+    "status": "Denmark won by 5 wkts",
+    "venue": "Svanholm Park, Brondby",
+    "date": "2026-06-20",
+    "dateTimeGMT": "2026-06-20T09:00:00",
+    "teams": [
+      "Denmark",
+      "Germany"
+    ],
+    "teamInfo": [
+      {
+        "name": "Denmark",
+        "shortname": "DEN",
+        "img": "https://g.cricapi.com/iapi/599-637867438645047537.webp?w=48"
+      },
+      {
+        "name": "Germany",
+        "shortname": "GER",
+        "img": "https://g.cricapi.com/iapi/25-637877087673982104.webp?w=48"
+      }
+    ],
+    "score": [
+      {
+        "r": 141,
+        "w": 9,
+        "o": 20,
+        "inning": "Germany Inning 1"
+      },
+      {
+        "r": 144,
+        "w": 5,
+        "o": 18.5,
+        "inning": "Denmark Inning 1"
+      }
+    ],
+    "series_id": "1861ee8d-531f-4add-95cc-a387ed74ca41",
+    "fantasyEnabled": true,
+    "bbbEnabled": false,
+    "hasSquad": false,
+    "matchStarted": true,
+    "matchEnded": true
+  },
+  {
+    "id": "835ba048-7109-4fb5-bf7a-2e9285b1ca8f",
+    "name": "Denmark vs Germany, 3rd T20I, Germany tour of Denmark, 2026",
+    "matchType": "t20",
+    "status": "Denmark won by 5 wkts",
+    "venue": "Svanholm Park, Brondby",
+    "date": "2026-06-19",
+    "dateTimeGMT": "2026-06-19T13:30:00",
+    "teams": [
+      "Denmark",
+      "Germany"
+    ],
+    "teamInfo": [
+      {
+        "name": "Denmark",
+        "shortname": "DEN",
+        "img": "https://g.cricapi.com/iapi/599-637867438645047537.webp?w=48"
+      },
+      {
+        "name": "Germany",
+        "shortname": "GER",
+        "img": "https://g.cricapi.com/iapi/25-637877087673982104.webp?w=48"
+      }
+    ],
+    "score": [
+      {
+        "r": 146,
+        "w": 9,
+        "o": 20,
+        "inning": "Denmark Inning 1"
+      },
+      {
+        "r": 148,
+        "w": 5,
+        "o": 19.2,
+        "inning": "Germany Inning 1"
+      }
+    ],
+    "series_id": "1861ee8d-531f-4add-95cc-a387ed74ca41",
+    "fantasyEnabled": true,
+    "bbbEnabled": false,
+    "hasSquad": false,
+    "matchStarted": true,
+    "matchEnded": true
+  },
+  {
+    "id": "bf010250-112a-48e1-abc6-b2d6295f5f59",
+    "name": "Denmark vs Germany, 2nd T20I, Germany tour of Denmark, 2026",
+    "matchType": "t20",
+    "status": "Denmark won by 7 wkts",
+    "venue": "Svanholm Park, Brondby",
+    "date": "2026-06-19",
+    "dateTimeGMT": "2026-06-19T08:30:00",
+    "teams": [
+      "Denmark",
+      "Germany"
+    ],
+    "teamInfo": [
+      {
+        "name": "Denmark",
+        "shortname": "DEN",
+        "img": "https://g.cricapi.com/iapi/599-637867438645047537.webp?w=48"
+      },
+      {
+        "name": "Germany",
+        "shortname": "GER",
+        "img": "https://g.cricapi.com/iapi/25-637877087673982104.webp?w=48"
+      }
+    ],
+    "score": [
+      {
+        "r": 187,
+        "w": 7,
+        "o": 20,
+        "inning": "germany Inning 1"
+      },
+      {
+        "r": 192,
+        "w": 3,
+        "o": 19.1,
+        "inning": "Denmark,Germany Inning 1"
+      }
+    ],
+    "series_id": "1861ee8d-531f-4add-95cc-a387ed74ca41",
+    "fantasyEnabled": true,
+    "bbbEnabled": false,
+    "hasSquad": false,
+    "matchStarted": true,
+    "matchEnded": true
+  },
+  {
+    "id": "3590aded-ecaa-4c0d-a1f4-7347b3a00ad7",
+    "name": "Denmark vs Germany, 1st T20I, Germany tour of Denmark, 2026",
+    "matchType": "t20",
+    "status": "Germany won by 2 wkts",
+    "venue": "Svanholm Park, Brondby",
+    "date": "2026-06-18",
+    "dateTimeGMT": "2026-06-18T00:00:00",
+    "teams": [
+      "Denmark",
+      "Germany"
+    ],
+    "teamInfo": [
+      {
+        "name": "Denmark",
+        "shortname": "DEN",
+        "img": "https://g.cricapi.com/iapi/599-637867438645047537.webp?w=48"
+      },
+      {
+        "name": "Germany",
+        "shortname": "GER",
+        "img": "https://g.cricapi.com/iapi/25-637877087673982104.webp?w=48"
+      }
+    ],
+    "score": [
+      {
+        "r": 116,
+        "w": 9,
+        "o": 20,
+        "inning": "denmark Inning 1"
+      },
+      {
+        "r": 117,
+        "w": 8,
+        "o": 19.5,
+        "inning": "Denmark,Germany Inning 1"
+      }
+    ],
+    "series_id": "1861ee8d-531f-4add-95cc-a387ed74ca41",
+    "fantasyEnabled": true,
+    "bbbEnabled": false,
+    "hasSquad": false,
+    "matchStarted": true,
+    "matchEnded": true
+  },
+  {
+    "id": "57cffeb4-a462-4c68-ab7a-2def6bf85211",
+    "name": "South Africa Women vs India Women, One-off Test, India Women tour of South Africa 2026",
+    "status": "Match starts at Dec 20, 08:00 GMT",
+    "venue": "St George's Park, Gqeberha",
+    "date": "2026-12-20",
+    "dateTimeGMT": "2026-12-20T08:00:00",
+    "teams": [
+      "South Africa Women",
+      "India Women"
+    ],
+    "teamInfo": [
+      {
+        "name": "India Women",
+        "shortname": "INDW",
+        "img": "https://g.cricapi.com/iapi/32-637877061328728555.webp?w=48"
+      },
+      {
+        "name": "South Africa Women",
+        "shortname": "RSAW",
+        "img": "https://g.cricapi.com/iapi/83-637877067733114809.webp?w=48"
+      }
+    ],
+    "series_id": "6a3b3216-1fe2-4263-9345-5a25f2dde7fb",
+    "fantasyEnabled": false,
+    "bbbEnabled": false,
+    "hasSquad": false,
+    "matchStarted": false,
+    "matchEnded": false
+  },
+  {
+    "id": "1b2a98c0-2aac-4c84-9c0e-fc4a1d375974",
+    "name": "South Africa Women vs India Women, 3rd ODI, India Women tour of South Africa 2026",
+    "status": "Match starts at Dec 15, 12:00 GMT",
+    "venue": "Newlands, Cape Town",
+    "date": "2026-12-15",
+    "dateTimeGMT": "2026-12-15T12:00:00",
+    "teams": [
+      "South Africa Women",
+      "India Women"
+    ],
+    "teamInfo": [
+      {
+        "name": "India Women",
+        "shortname": "INDW",
+        "img": "https://g.cricapi.com/iapi/32-637877061328728555.webp?w=48"
+      },
+      {
+        "name": "South Africa Women",
+        "shortname": "RSAW",
+        "img": "https://g.cricapi.com/iapi/83-637877067733114809.webp?w=48"
+      }
+    ],
+    "series_id": "6a3b3216-1fe2-4263-9345-5a25f2dde7fb",
+    "fantasyEnabled": false,
+    "bbbEnabled": false,
+    "hasSquad": false,
+    "matchStarted": false,
+    "matchEnded": false
+  },
+  {
+    "id": "06b68101-13f9-4d74-b453-fa4492bd13d7",
+    "name": "South Africa Women vs India Women, 2nd ODI, India Women tour of South Africa 2026",
+    "status": "Match starts at Dec 12, 08:00 GMT",
+    "venue": "Mangaung Oval, Bloemfontein",
+    "date": "2026-12-12",
+    "dateTimeGMT": "2026-12-12T08:00:00",
+    "teams": [
+      "South Africa Women",
+      "India Women"
+    ],
+    "teamInfo": [
+      {
+        "name": "India Women",
+        "shortname": "INDW",
+        "img": "https://g.cricapi.com/iapi/32-637877061328728555.webp?w=48"
+      },
+      {
+        "name": "South Africa Women",
+        "shortname": "RSAW",
+        "img": "https://g.cricapi.com/iapi/83-637877067733114809.webp?w=48"
+      }
+    ],
+    "series_id": "6a3b3216-1fe2-4263-9345-5a25f2dde7fb",
+    "fantasyEnabled": false,
+    "bbbEnabled": false,
+    "hasSquad": false,
+    "matchStarted": false,
+    "matchEnded": false
+  },
+  {
+    "id": "48662fd8-6ecb-4b90-acc5-16971ab25bcf",
+    "name": "South Africa Women vs India Women, 1st ODI, India Women tour of South Africa 2026",
+    "status": "Match starts at Dec 09, 12:00 GMT",
+    "venue": "Senwes Park, Potchefstroom",
+    "date": "2026-12-09",
+    "dateTimeGMT": "2026-12-09T12:00:00",
+    "teams": [
+      "South Africa Women",
+      "India Women"
+    ],
+    "teamInfo": [
+      {
+        "name": "India Women",
+        "shortname": "INDW",
+        "img": "https://g.cricapi.com/iapi/32-637877061328728555.webp?w=48"
+      },
+      {
+        "name": "South Africa Women",
+        "shortname": "RSAW",
+        "img": "https://g.cricapi.com/iapi/83-637877067733114809.webp?w=48"
+      }
+    ],
+    "series_id": "6a3b3216-1fe2-4263-9345-5a25f2dde7fb",
+    "fantasyEnabled": false,
+    "bbbEnabled": false,
+    "hasSquad": false,
+    "matchStarted": false,
+    "matchEnded": false
+  },
+  {
+    "id": "fd14f45e-f135-4cf9-b4f5-8709ec5ba2eb",
+    "name": "South Africa vs Australia, 3rd Test, Australia tour of South Africa, 2026",
+    "status": "Match starts at Oct 27, 08:00 GMT",
+    "venue": "Newlands, Cape Town",
+    "date": "2026-10-27",
+    "dateTimeGMT": "2026-10-27T08:00:00",
+    "teams": [
+      "South Africa",
+      "Australia"
+    ],
+    "teamInfo": [
+      {
+        "name": "Australia",
+        "shortname": "AUS",
+        "img": "https://g.cricapi.com/iapi/6-637877070670541994.webp?w=48"
+      },
+      {
+        "name": "South Africa",
+        "shortname": "RSA",
+        "img": "https://g.cricapi.com/iapi/82-637877071839088912.webp?w=48"
+      }
+    ],
+    "series_id": "0c2de514-946a-4b55-a6e3-4d1d6e892459",
+    "fantasyEnabled": false,
+    "bbbEnabled": false,
+    "hasSquad": false,
+    "matchStarted": false,
+    "matchEnded": false
+  },
+  {
+    "id": "5010a2a3-e970-4ec8-b115-04c6dc800952",
+    "name": "South Africa vs Australia, 2nd Test, Australia tour of South Africa, 2026",
+    "status": "Match starts at Oct 18, 07:30 GMT",
+    "venue": "St George's Park, Gqeberha",
+    "date": "2026-10-18",
+    "dateTimeGMT": "2026-10-18T08:00:00",
+    "teams": [
+      "South Africa",
+      "Australia"
+    ],
+    "teamInfo": [
+      {
+        "name": "Australia",
+        "shortname": "AUS",
+        "img": "https://g.cricapi.com/iapi/6-637877070670541994.webp?w=48"
+      },
+      {
+        "name": "South Africa",
+        "shortname": "RSA",
+        "img": "https://g.cricapi.com/iapi/82-637877071839088912.webp?w=48"
+      }
+    ],
+    "series_id": "0c2de514-946a-4b55-a6e3-4d1d6e892459",
+    "fantasyEnabled": false,
+    "bbbEnabled": false,
+    "hasSquad": false,
+    "matchStarted": false,
+    "matchEnded": false
+  },
+  {
+    "id": "1dda32e9-219c-43dd-9512-5b4ed1e647d2",
+    "name": "South Africa vs Australia, 1st Test, Australia tour of South Africa, 2026",
+    "status": "Match starts at Oct 09, 07:30 GMT",
+    "venue": "Kingsmead, Durban",
+    "date": "2026-10-09",
+    "dateTimeGMT": "2026-10-09T07:30:00",
+    "teams": [
+      "South Africa",
+      "Australia"
+    ],
+    "teamInfo": [
+      {
+        "name": "Australia",
+        "shortname": "AUS",
+        "img": "https://g.cricapi.com/iapi/6-637877070670541994.webp?w=48"
+      },
+      {
+        "name": "South Africa",
+        "shortname": "RSA",
+        "img": "https://g.cricapi.com/iapi/82-637877071839088912.webp?w=48"
+      }
+    ],
+    "series_id": "0c2de514-946a-4b55-a6e3-4d1d6e892459",
+    "fantasyEnabled": false,
+    "bbbEnabled": false,
+    "hasSquad": false,
+    "matchStarted": false,
+    "matchEnded": false
+  },
+  {
+    "id": "b171f697-9270-4448-b8c0-7b6c6074d4b8",
+    "name": "South Africa vs Australia, 3rd ODI, Australia tour of South Africa, 2026",
+    "status": "Match starts at Sep 30, 11:00 GMT",
+    "venue": "Senwes Park, Potchefstroom",
+    "date": "2026-09-30",
+    "dateTimeGMT": "2026-09-30T11:30:00",
+    "teams": [
+      "South Africa",
+      "Australia"
+    ],
+    "teamInfo": [
+      {
+        "name": "Australia",
+        "shortname": "AUS",
+        "img": "https://g.cricapi.com/iapi/6-637877070670541994.webp?w=48"
+      },
+      {
+        "name": "South Africa",
+        "shortname": "RSA",
+        "img": "https://g.cricapi.com/iapi/82-637877071839088912.webp?w=48"
+      }
+    ],
+    "series_id": "0c2de514-946a-4b55-a6e3-4d1d6e892459",
+    "fantasyEnabled": false,
+    "bbbEnabled": false,
+    "hasSquad": false,
+    "matchStarted": false,
+    "matchEnded": false
+  },
+  {
+    "id": "fecf1d1a-5cdf-4801-a15a-d0aceb1b1ce1",
+    "name": "South Africa vs Australia, 2nd ODI, Australia tour of South Africa, 2026",
+    "status": "Match starts at Sep 27, 08:00 GMT",
+    "venue": "The Wanderers Stadium, Johannesburg",
+    "date": "2026-09-27",
+    "dateTimeGMT": "2026-09-27T08:00:00",
+    "teams": [
+      "South Africa",
+      "Australia"
+    ],
+    "teamInfo": [
+      {
+        "name": "Australia",
+        "shortname": "AUS",
+        "img": "https://g.cricapi.com/iapi/6-637877070670541994.webp?w=48"
+      },
+      {
+        "name": "South Africa",
+        "shortname": "RSA",
+        "img": "https://g.cricapi.com/iapi/82-637877071839088912.webp?w=48"
+      }
+    ],
+    "series_id": "0c2de514-946a-4b55-a6e3-4d1d6e892459",
+    "fantasyEnabled": false,
+    "bbbEnabled": false,
+    "hasSquad": false,
+    "matchStarted": false,
+    "matchEnded": false
+  },
+  {
+    "id": "57b077d1-b2f5-4040-8cf2-b25b5fcd39aa",
+    "name": "South Africa vs Australia, 1st ODI, Australia tour of South Africa, 2026",
+    "status": "Match starts at Sep 24, 08:00 GMT",
+    "venue": "Kingsmead, Durban",
+    "date": "2026-09-24",
+    "dateTimeGMT": "2026-09-24T08:00:00",
+    "teams": [
+      "South Africa",
+      "Australia"
+    ],
+    "teamInfo": [
+      {
+        "name": "Australia",
+        "shortname": "AUS",
+        "img": "https://g.cricapi.com/iapi/6-637877070670541994.webp?w=48"
+      },
+      {
+        "name": "South Africa",
+        "shortname": "RSA",
+        "img": "https://g.cricapi.com/iapi/82-637877071839088912.webp?w=48"
+      }
+    ],
+    "series_id": "0c2de514-946a-4b55-a6e3-4d1d6e892459",
+    "fantasyEnabled": false,
+    "bbbEnabled": false,
+    "hasSquad": false,
+    "matchStarted": false,
+    "matchEnded": false
+  },
+  {
+    "id": "74d7f367-1f5b-4ba0-b9dd-8c5b744e234e",
+    "name": "Zimbabwe vs Bangladesh, 3rd T20I, Bangladesh tour of Zimbabwe, 2026",
+    "matchType": "t20",
+    "status": "Match starts at Jul 19, 11:30 GMT",
+    "venue": "Queens Sports Club, Bulawayo",
+    "date": "2026-07-19",
+    "dateTimeGMT": "2026-07-19T11:30:00",
+    "teams": [
+      "Zimbabwe",
+      "Bangladesh"
+    ],
+    "teamInfo": [
+      {
+        "name": "Bangladesh",
+        "shortname": "BAN",
+        "img": "https://g.cricapi.com/iapi/9-637877074109248302.webp?w=48"
+      },
+      {
+        "name": "Zimbabwe",
+        "shortname": "ZIM",
+        "img": "https://g.cricapi.com/iapi/575-637877079629985215.webp?w=48"
+      }
+    ],
+    "series_id": "0780a9a5-dbab-4c33-8235-40b694ec994e",
+    "fantasyEnabled": false,
+    "bbbEnabled": false,
+    "hasSquad": false,
+    "matchStarted": false,
+    "matchEnded": false
+  },
+  {
+    "id": "de3ace51-a87d-41fc-bf33-4e26c844e079",
+    "name": "Zimbabwe vs Bangladesh, 2nd T20I, Bangladesh tour of Zimbabwe, 2026",
+    "matchType": "t20",
+    "status": "Match starts at Jul 17, 11:30 GMT",
+    "venue": "Queens Sports Club, Bulawayo",
+    "date": "2026-07-17",
+    "dateTimeGMT": "2026-07-17T11:30:00",
+    "teams": [
+      "Zimbabwe",
+      "Bangladesh"
+    ],
+    "teamInfo": [
+      {
+        "name": "Bangladesh",
+        "shortname": "BAN",
+        "img": "https://g.cricapi.com/iapi/9-637877074109248302.webp?w=48"
+      },
+      {
+        "name": "Zimbabwe",
+        "shortname": "ZIM",
+        "img": "https://g.cricapi.com/iapi/575-637877079629985215.webp?w=48"
+      }
+    ],
+    "series_id": "0780a9a5-dbab-4c33-8235-40b694ec994e",
+    "fantasyEnabled": false,
+    "bbbEnabled": false,
+    "hasSquad": false,
+    "matchStarted": false,
+    "matchEnded": false
+  },
+  {
+    "id": "b1892f6f-966a-4cf3-b34c-80a533f7c5c0",
+    "name": "Zimbabwe vs Bangladesh, 1st T20I, Bangladesh tour of Zimbabwe, 2026",
+    "matchType": "t20",
+    "status": "Match starts at Jul 15, 11:30 GMT",
+    "venue": "Queens Sports Club, Bulawayo",
+    "date": "2026-07-15",
+    "dateTimeGMT": "2026-07-15T11:30:00",
+    "teams": [
+      "Zimbabwe",
+      "Bangladesh"
+    ],
+    "teamInfo": [
+      {
+        "name": "Bangladesh",
+        "shortname": "BAN",
+        "img": "https://g.cricapi.com/iapi/9-637877074109248302.webp?w=48"
+      },
+      {
+        "name": "Zimbabwe",
+        "shortname": "ZIM",
+        "img": "https://g.cricapi.com/iapi/575-637877079629985215.webp?w=48"
+      }
+    ],
+    "series_id": "0780a9a5-dbab-4c33-8235-40b694ec994e",
+    "fantasyEnabled": false,
+    "bbbEnabled": false,
+    "hasSquad": false,
+    "matchStarted": false,
+    "matchEnded": false
+  },
+  {
+    "id": "1f31d27a-64be-4607-85c3-5d234be9f93d",
+    "name": "Zimbabwe vs Bangladesh, 3rd ODI, Bangladesh tour of Zimbabwe, 2026",
+    "status": "Match starts at Jul 11, 07:15 GMT",
+    "venue": "Harare Sports Club, Harare",
+    "date": "2026-07-11",
+    "dateTimeGMT": "2026-07-11T07:15:00",
+    "teams": [
+      "Zimbabwe",
+      "Bangladesh"
+    ],
+    "teamInfo": [
+      {
+        "name": "Bangladesh",
+        "shortname": "BAN",
+        "img": "https://g.cricapi.com/iapi/9-637877074109248302.webp?w=48"
+      },
+      {
+        "name": "Zimbabwe",
+        "shortname": "ZIM",
+        "img": "https://g.cricapi.com/iapi/575-637877079629985215.webp?w=48"
+      }
+    ],
+    "series_id": "0780a9a5-dbab-4c33-8235-40b694ec994e",
+    "fantasyEnabled": false,
+    "bbbEnabled": false,
+    "hasSquad": false,
+    "matchStarted": false,
+    "matchEnded": false
+  },
+  {
+    "id": "369a0234-af6d-451d-9c3c-8e2a5c03a4a1",
+    "name": "Zimbabwe vs Bangladesh, 2nd ODI, Bangladesh tour of Zimbabwe, 2026",
+    "status": "Match starts at Jul 09, 07:15 GMT",
+    "venue": "Harare Sports Club, Harare",
+    "date": "2026-07-09",
+    "dateTimeGMT": "2026-07-09T07:15:00",
+    "teams": [
+      "Zimbabwe",
+      "Bangladesh"
+    ],
+    "teamInfo": [
+      {
+        "name": "Bangladesh",
+        "shortname": "BAN",
+        "img": "https://g.cricapi.com/iapi/9-637877074109248302.webp?w=48"
+      },
+      {
+        "name": "Zimbabwe",
+        "shortname": "ZIM",
+        "img": "https://g.cricapi.com/iapi/575-637877079629985215.webp?w=48"
+      }
+    ],
+    "series_id": "0780a9a5-dbab-4c33-8235-40b694ec994e",
+    "fantasyEnabled": false,
+    "bbbEnabled": false,
+    "hasSquad": false,
+    "matchStarted": false,
+    "matchEnded": false
+  }
+]

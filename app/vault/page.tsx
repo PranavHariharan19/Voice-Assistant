@@ -117,7 +117,7 @@ export default function VaultPage() {
           </button>
         </form>
         <div className="mt-6 text-center">
-          <Link href="/" className="text-sm font-bold text-[#17211F]/60 hover:text-[#00A19B] transition-colors">
+          <Link href="/calendar" className="text-sm font-bold text-[#17211F]/60 hover:text-[#00A19B] transition-colors">
             Return to Calendar
           </Link>
         </div>

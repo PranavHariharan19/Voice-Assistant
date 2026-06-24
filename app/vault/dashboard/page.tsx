@@ -336,7 +336,7 @@ export default function VaultDashboard() {
               disabled={isRestoring}
             />
           </label>
-          <Link href="/" className="text-[#17211F]/60 font-bold hover:text-[#00A19B] transition">
+          <Link href="/calendar" className="text-[#17211F]/60 font-bold hover:text-[#00A19B] transition">
             Exit Vault
           </Link>
         </div>
