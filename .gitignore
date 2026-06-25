@@ -45,3 +45,10 @@ next-env.d.ts
 .idea/
 .eslintcache
 cricket_matches.json
+
+# PWA generated service workers
+public/sw.js
+public/sw.js.map
+public/workbox-*.js
+public/workbox-*.js.map
+public/fallback-*

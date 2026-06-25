@@ -1,0 +1,18 @@
+{
+  "name": "Mint Assistant & Calendar",
+  "short_name": "Mint Assistant",
+  "description": "Your AI-powered personal assistant, dynamic calendar, sports schedule tracker, and secure vault.",
+  "start_url": "/calendar",
+  "display": "standalone",
+  "background_color": "#E4DDD3",
+  "theme_color": "#00A19B",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

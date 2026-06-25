@@ -302,10 +302,10 @@ export default function VaultDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-[#E4DDD3] p-8">
-      <header className="flex justify-between items-center mb-10 max-w-6xl mx-auto">
+    <div className="min-h-screen bg-[#E4DDD3] p-4 sm:p-8">
+      <header className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center mb-10 max-w-6xl mx-auto">
         <h1 className="text-3xl font-bold text-[#17211F]">Vault Dashboard</h1>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-4">
           {items.length > 0 && (
             <>
               <button

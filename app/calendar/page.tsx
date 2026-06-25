@@ -1245,7 +1245,7 @@ export default function Home() {
             </div>
           </section>
 
-          <aside className="flex flex-col gap-5 w-full xl:w-[560px] shrink-0 h-[calc(100vh-80px)]">
+          <aside className="flex flex-col gap-5 w-full xl:w-[560px] shrink-0 h-auto xl:h-[calc(100vh-80px)]">
             <div className="flex flex-col flex-1 gap-5 overflow-hidden">
               <section className="side-panel animate-rise delay-100 shrink-0">
               <div className="flex items-start justify-between gap-3">
@@ -1326,9 +1326,10 @@ export default function Home() {
           </aside>
 
           {((selectedEvent && isDetailOpen) || formMode || searchQuery.trim().length > 0 || isChatOpen) && (
-            <div className="flex flex-col gap-5 w-full xl:w-[360px] shrink-0 content-start">
-              {isChatOpen && (
-                <section className="side-panel flex flex-col h-[calc(100vh-80px)] animate-rise">
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm xl:relative xl:inset-auto xl:z-0 xl:block xl:w-[360px] xl:shrink-0 xl:bg-transparent xl:p-0 xl:backdrop-blur-none">
+              <div className="w-full max-w-lg rounded-3xl bg-[#E4DDD3] p-6 shadow-2xl max-h-[90vh] overflow-y-auto flex flex-col gap-5 xl:max-w-none xl:rounded-none xl:bg-transparent xl:p-0 xl:shadow-none xl:max-h-none xl:overflow-visible">
+                {isChatOpen && (
+                  <section className="side-panel flex flex-col h-[500px] sm:h-[600px] xl:h-[calc(100vh-80px)] animate-rise">
                   <div className="flex items-center justify-between border-b border-[#17211f]/10 pb-4 mb-4 shrink-0">
                     <p className="text-sm font-semibold text-[#00A19B]">Chat Assistant</p>
                     <button onClick={() => setIsChatOpen(false)} className="text-[#17211f]/40 hover:text-[#17211f] transition-colors" aria-label="Close Chat">
@@ -1535,6 +1536,7 @@ export default function Home() {
                   </form>
                 </section>
               )}
+              </div>
             </div>
           )}
         </div>

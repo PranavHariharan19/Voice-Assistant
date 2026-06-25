@@ -102,7 +102,7 @@ export default function SportsPage() {
   const [timeFilter, setTimeFilter] = useState<'all' | 'today' | 'this_week'>('all');
   const [isAddMode, setIsAddMode] = useState(false);
   const [selectedMatches, setSelectedMatches] = useState<Set<string>>(new Set());
-  const [showPopup, setShowPopup] = useState(false);
+  const [toast, setToast] = useState<{ success?: string; error?: string } | null>(null);
   const [isAdding, setIsAdding] = useState(false);
 
   const sensors = useSensors(
@@ -328,30 +328,65 @@ export default function SportsPage() {
         setIsAdding(true);
         const matchesToAdd = filteredSchedule.filter((m: any) => selectedMatches.has(m.id || m.title));
         
-        const payloads = matchesToAdd.map((match: any) => {
+        const dateKeys = Array.from(new Set(matchesToAdd.map((match: any) => {
+          const parsed = parseDateTime(match.date, match.time);
+          return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
+        })));
+
+        const { data: existingEvents } = await supabase
+          .from("events")
+          .select("event_name, event_date")
+          .eq("user_id", user?.id)
+          .in("event_date", dateKeys);
+
+        const payloads: any[] = [];
+        const duplicateTitles: string[] = [];
+        const existingList = existingEvents || [];
+
+        for (const match of matchesToAdd) {
           const parsed = parseDateTime(match.date, match.time);
           const dKey = `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
           
-          let tStr = null;
-          if (match.time) {
-             tStr = `${String(parsed.getHours()).padStart(2, '0')}:${String(parsed.getMinutes()).padStart(2, '0')}`;
+          const isDuplicate = existingList.some(
+            (ev) => ev.event_name?.trim().toLowerCase() === match.title?.trim().toLowerCase() && ev.event_date === dKey
+          );
+
+          if (isDuplicate) {
+            if (match.title) duplicateTitles.push(match.title);
+          } else {
+            let tStr = null;
+            if (match.time) {
+               tStr = `${String(parsed.getHours()).padStart(2, '0')}:${String(parsed.getMinutes()).padStart(2, '0')}`;
+            }
+            payloads.push({
+               event_name: match.title,
+               event_date: dKey,
+               event_time: tStr,
+               additional_info: match.venue || "",
+               user_id: user?.id
+            });
+            existingList.push({ event_name: match.title, event_date: dKey });
           }
-          
-          return {
-             event_name: match.title,
-             event_date: dKey,
-             event_time: tStr,
-             additional_info: match.venue || "",
-             user_id: user?.id
-          };
-        });
+        }
         
         if (payloads.length > 0) {
           await supabase.from("events").insert(payloads);
         }
         
-        setShowPopup(true);
-        setTimeout(() => setShowPopup(false), 3000);
+        const uniqueDupes = Array.from(new Set(duplicateTitles));
+        let successMsg: string | undefined = undefined;
+        let errorMsg: string | undefined = undefined;
+
+        if (payloads.length > 0) {
+          successMsg = "Matches added to calendar";
+        }
+        if (uniqueDupes.length > 0) {
+          const formattedNames = uniqueDupes.map(t => `'${t}'`).join(", ");
+          errorMsg = `${formattedNames} had already been added to the calendar.`;
+        }
+
+        setToast({ success: successMsg, error: errorMsg });
+        setTimeout(() => setToast(null), 4000);
         setIsAdding(false);
       }
       setIsAddMode(false);
@@ -444,7 +479,7 @@ export default function SportsPage() {
           </div>
         ) : (
           <div className="flex justify-between gap-8 items-start h-full pb-10">
-            <div className={`flex-1 transition-all duration-500 ${selectedEntity ? 'max-w-[55%]' : 'w-full'}`}>
+            <div className={`flex-1 transition-all duration-500 ${selectedEntity ? 'w-full lg:max-w-[55%]' : 'w-full'}`}>
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={filteredEntities.map((e) => e.id)} strategy={rectSortingStrategy}>
                   <div className={`grid grid-cols-1 gap-6 ${selectedEntity ? 'sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3' : 'sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}`}>
@@ -463,7 +498,8 @@ export default function SportsPage() {
             
             {/* Right Side Window for Schedules */}
             {selectedEntity && (
-              <div className="w-[40%] sticky top-24 bg-white/80 backdrop-blur-xl border border-white rounded-3xl p-6 shadow-xl shadow-[#00A19B]/5 h-[calc(100vh-140px)] overflow-hidden hidden md:flex flex-col animate-in fade-in slide-in-from-right-8 duration-300">
+              <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4 backdrop-blur-sm lg:relative lg:inset-auto lg:z-0 lg:flex lg:w-[40%] lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
+                <div className="w-full max-h-[85vh] sm:max-w-xl rounded-t-3xl sm:rounded-3xl bg-white p-6 shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom-10 lg:sticky lg:top-24 lg:h-[calc(100vh-140px)] lg:max-h-none lg:w-full lg:rounded-3xl lg:bg-white/80 lg:backdrop-blur-xl lg:border lg:border-white lg:shadow-xl lg:shadow-[#00A19B]/5">
                 <div className="flex items-start justify-between mb-6">
                   <div>
                     <h2 className="text-2xl font-bold text-[#17211f]">Upcoming Schedule</h2>
@@ -597,17 +633,30 @@ export default function SportsPage() {
                   })()}
                 </div>
               </div>
-            )}
+            </div>
+          )}
           </div>
         )}
       </div>
       
-      {showPopup && (
-        <div className="fixed bottom-6 right-6 bg-[#00A19B] text-white px-6 py-3 rounded-xl shadow-2xl z-50 animate-in slide-in-from-bottom-5 fade-in duration-300 font-semibold flex items-center gap-3">
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
-            <path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/>
-          </svg>
-          Matches added to calendar
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3 max-w-lg">
+          {toast.success && (
+            <div className="bg-[#00A19B] text-white px-6 py-3 rounded-xl shadow-2xl animate-in slide-in-from-bottom-5 fade-in duration-300 font-semibold flex items-center gap-3">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/>
+              </svg>
+              <span>{toast.success}</span>
+            </div>
+          )}
+          {toast.error && (
+            <div className="bg-red-600 text-white px-6 py-3 rounded-xl shadow-2xl animate-in slide-in-from-bottom-5 fade-in duration-300 font-semibold flex items-center gap-3">
+              <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <span>{toast.error}</span>
+            </div>
+          )}
         </div>
       )}
     </main>
