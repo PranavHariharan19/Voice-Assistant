@@ -1,35 +1,88 @@
 # 🎙️ My Personal AI Dashboard
 
-I built this project to solve my own daily organization problems. I wanted a single, unified dashboard where I could manage my schedule, store my important documents, and keep track of my favorite sports teams—all without the usual clicking and typing. 
+I built this project to solve my own daily organization and productivity needs. I wanted a single, unified personal dashboard where I could manage my schedule, keep track of daily recurring routines, store my private documents, and follow my favorite sports teams—all with a voice-first philosophy and a clean, responsive UI.
 
-By integrating **Google Gemini 2.0 Flash**, I've created a voice-first assistant that actually understands what I mean when I speak to it, making it feel less like software and more like a personal companion.
+By integrating the **Google Gemini API**, I've created an AI assistant that understands natural voice and text commands, handling calendar operations and queries effortlessly.
+
+---
 
 ## 🚀 Why I Built This
 
-Most calendar apps are tedious. They require manual entry and endless scrolling. I wanted to replace all of that with a **voice-first philosophy**. 
+Traditional productivity apps are fragmented. Calendars require manual clicking, routine checklists live in separate todo apps, document storage requires external cloud drives, and sports schedules require searching multiple sites.
 
-Whether I'm on the go or deep into a work session, I can just talk to my calendar. It understands intent, context, and time, allowing me to manage my life naturally. I can tell it to schedule meetings, reschedule them, or find specific events, and it handles everything instantly.
+I wanted to consolidate everything into a single, cohesive dashboard with a **voice-first interface**:
+- Speak commands directly to schedule, reschedule, or find events.
+- Track daily routines that auto-reset every day.
+- Access secure document vaults and sports fixtures instantly.
+
+---
 
 ## ✨ Features I Use Daily
 
-### 🧠 Voice-Powered Intelligence
-The core of my dashboard uses the **Gemini 2.0 Flash** model. It processes my spoken words in real-time and understands complex commands. 
-- **Frictionless Entry**: "Schedule a project review for next Tuesday at 4 PM."
-- **Instant Rescheduling**: "Actually, move that Tuesday meeting to Friday morning."
-- **Smart Searching**: "Find all my dentist appointments from this month."
-- **Interactive Briefing**: "What does my day look like today?" — The assistant reads my schedule back to me.
+### 🧠 Voice & Text AI Assistant
+Powered by the **Gemini API**, the embedded assistant processes spoken or typed commands in real-time:
+- **Voice Scheduling**: *"Schedule a project review for next Tuesday at 4 PM."*
+- **Instant Updates**: *"Reschedule my Tuesday meeting to Friday at 10 AM."*
+- **Smart Queries**: *"Find all my dentist appointments from this month."*
+- **Voice Feedback**: Spoken audio confirmation for all assistant actions.
+
+### 📅 Interactive Calendar & Event Management
+- **Full Calendar Views**: Month and year navigation with quick Jump-to-Today controls.
+- **Category Filtering**: Instant filtering for *Quiz*, *Assignment*, and *Other* events.
+- **Drag-and-Drop Rescheduling**: Drag any event chip directly onto a new date.
+- **Today's Overview**: Dedicated card showing today's events at a glance.
+
+### 📝 Persistent Daily Routine Tracker
+- **Recurring Activities**: Checklist for daily activities independent of calendar dates.
+- **Time Pickers**: Add optional times for routine tasks.
+- **Automatic Daily Reset**: Tasks checked off today automatically reset to unticked the next day.
+- **User Persistence**: Synced in local storage per logged-in user.
+
+### 🗂️ Features Hub & Navigation
+- **Quick Action Cards**: Dedicated hub in the sidebar for instant access to *Routine*, *Vault*, and *Sports*.
+- **Seamless Panel Switching**: Clean embedded panel views with 1-click close buttons.
 
 ### 🛡️ Secure Document Vault
-I needed a safe place to store my PDFs, images, and important text files, so I built the **Vault**. It uses robust cloud storage and features a built-in search, allowing me to instantly retrieve any document exactly when I need it.
+- **Private Vault**: Cloud document storage for PDFs, images, and notes.
+- **Categorization & Search**: Filter and retrieve files instantly.
 
-### 🏆 My Sports Hub
-I'm a big sports fan, but keeping track of match times across different websites was annoying. So, I built a real-time, highly accurate fixture tracker for the teams and sports I actually watch:
-- **Cricket**: Deep integration for India Men's, India Women's, ICC World Cups, and major tournaments.
-- **Formula 1**: Tracking every Grand Prix weekend.
-- **Football, Tennis, Badminton, Kabaddi**: Reliable schedules for the major leagues and international games I follow.
-
-### 🔐 Secure & Private
-Since this is my personal data, security was a priority. It's built with **Supabase** and **Next.js**, protected by enterprise-grade Row Level Security (RLS). My events, vault documents, and preferences are strictly private and sync across all my devices in real-time.
+### 🏆 Sports Fixture Tracker
+- Real-time match schedules for **Cricket** (India Men's/Women's, ICC events), **Formula 1**, **Football**,**Kabaddi**, and more.
 
 ---
-*Built as a passion project to make my daily routine faster, smarter, and more organized.*
+
+## 🛠️ Tech Stack
+
+- **Framework**: Next.js (App Router, TypeScript)
+- **Styling**: Vanilla CSS (Tailwind utilities, glassmorphism design system, dark/warm color palette)
+- **Database & Auth**: Supabase (PostgreSQL, Row Level Security, Auth)
+- **AI & Speech**: Google Gemini API & Web Speech API
+
+---
+
+## 📦 Getting Started
+
+### 1. Clone & Install
+```bash
+git clone https://github.com/PranavHariharan19/Voice-Assistant.git
+cd Voice-Assistant
+npm install
+```
+
+### 2. Environment Variables
+Create `.env.local` in the project root:
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+GEMINI_API_KEY=your_gemini_api_key
+```
+
+### 3. Run Locally
+```bash
+npm run dev
+```
+Open [http://localhost:3000](http://localhost:3000) to view the app.
+
+---
+
+*Built with passion as a personal tool to make daily routine, calendar management, and productivity effortless.*
