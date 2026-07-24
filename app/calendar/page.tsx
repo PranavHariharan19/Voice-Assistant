@@ -25,6 +25,13 @@ type EventFormValues = {
 
 type EventFormMode = "add" | "reschedule" | null;
 
+type PopupState = {
+  eventId: number | string;
+  event: CalendarEvent;
+  x: number;
+  y: number;
+} | null;
+
 type EventRow = {
   event_id: number | string;
   event_name: string;
@@ -181,6 +188,21 @@ export default function Home() {
 
   const [filterFromDate, setFilterFromDate] = useState("");
   const [filterToDate, setFilterToDate] = useState("");
+  const [popupState, setPopupState] = useState<PopupState>(null);
+  const [copiedEventId, setCopiedEventId] = useState<number | string | null>(null);
+
+  useEffect(() => {
+    if (!popupState) return;
+
+    const handleClickOutside = () => {
+      setPopupState(null);
+    };
+
+    window.addEventListener("click", handleClickOutside);
+    return () => {
+      window.removeEventListener("click", handleClickOutside);
+    };
+  }, [popupState]);
 
   const [isListening, setIsListening] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -910,6 +932,41 @@ export default function Home() {
     }));
   }
 
+  async function copyEvent(eventToCopy: CalendarEvent) {
+    setPopupState(null);
+
+    const payload = {
+      event_name: eventToCopy.title,
+      event_date: eventToCopy.date,
+      event_time: eventToCopy.time || null,
+      additional_info: eventToCopy.additionalInformation || null,
+      user_id: user?.id,
+    };
+
+    const { data, error } = await supabase
+      .from("events")
+      .insert([payload])
+      .select("event_id,event_name,event_date,event_time,additional_info")
+      .single();
+
+    if (error) {
+      console.error("Could not duplicate event:", error.message);
+      return;
+    }
+
+    const newEvent = mapEventRow(data as EventRow);
+
+    setEventsByDate((current) => ({
+      ...current,
+      [newEvent.date]: [...(current[newEvent.date] ?? []), newEvent],
+    }));
+
+    setCopiedEventId(newEvent.id);
+    setTimeout(() => {
+      setCopiedEventId(null);
+    }, 3000);
+  }
+
   async function submitEventForm(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -1251,7 +1308,7 @@ export default function Home() {
                     <span className="day-number">{item.date.getDate()}</span>
                     {events.length > 0 && (
                       <div className="event-chips" aria-label="Events">
-                        {events.slice(0, 3).map((event) => {
+                        {events.slice(0, 5).map((event) => {
                           const titleLower = event.title.toLowerCase();
                           const infoLower = event.additionalInformation?.toLowerCase() || "";
                           
@@ -1266,7 +1323,9 @@ export default function Home() {
 
                           return (
                           <div
-                            className={`event-chip ${event.tone} ${isDimmer ? 'opacity-30' : 'opacity-100'}`}
+                            className={`event-chip ${event.tone} ${isDimmer ? 'opacity-30' : 'opacity-100'} ${
+                              event.id === copiedEventId ? 'ring-2 ring-[#00A19B] animate-bounce shadow-md' : ''
+                            }`}
                             key={event.id}
                             draggable
                             onDragStart={(e) => {
@@ -1276,10 +1335,21 @@ export default function Home() {
                             }}
                             onClick={(e) => {
                               e.stopPropagation();
-                              selectEvent(event);
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              setPopupState({
+                                eventId: event.id,
+                                event,
+                                x: rect.left + rect.width / 2,
+                                y: rect.top,
+                              });
                             }}
                           >
                             <span className="event-chip-name">{event.title}</span>
+                            {event.id === copiedEventId && (
+                              <span className="ml-1 rounded bg-white/30 px-1 py-0.2 text-[9px] font-extrabold uppercase text-white shrink-0">
+                                Copied
+                              </span>
+                            )}
                             <button
                               type="button"
                               className="event-chip-delete"
@@ -1741,6 +1811,46 @@ export default function Home() {
           </aside>
         </div>
       </section>
+
+      {popupState && (
+        <div
+          className="fixed z-50 animate-rise"
+          style={{
+            left: `${popupState.x}px`,
+            top: `${popupState.y - 8}px`,
+            transform: "translate(-50%, -100%)",
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex flex-col gap-1 rounded-xl border border-[#17211f]/15 bg-[#f7f2ea] p-1.5 shadow-2xl backdrop-blur-md min-w-[120px]">
+            <button
+              type="button"
+              onClick={() => copyEvent(popupState.event)}
+              className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-bold text-[#17211f] hover:bg-[#00A19B] hover:text-white transition-all cursor-pointer"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M4 1.5H3a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-1h1a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v1H4zM3 3h8a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm6 0V2a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-1V4a1 1 0 0 0-1-1H9z"/>
+              </svg>
+              <span>Copy</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                selectEvent(popupState.event);
+                setPopupState(null);
+              }}
+              className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold text-[#17211f]/80 hover:bg-[#17211f]/10 transition-colors cursor-pointer"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/>
+              </svg>
+              <span>Details</span>
+            </button>
+          </div>
+          <div className="mx-auto -mt-1 h-2 w-2 rotate-45 border-b border-r border-[#17211f]/15 bg-[#f7f2ea]" />
+        </div>
+      )}
     </main>
   );
 }
