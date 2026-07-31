@@ -1419,7 +1419,7 @@ export default function Home() {
 
                 return (
                   <div
-                    className={`calendar-cell ${isToday ? "is-today" : ""} ${
+                    className={`group calendar-cell ${isToday ? "is-today" : ""} ${
                       isSelected ? "is-selected" : ""
                     }`}
                     key={item.id}
@@ -1434,6 +1434,25 @@ export default function Home() {
                       }
                     }}
                   >
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        selectDate(item.date);
+                        setFormValues(createEmptyForm(displayDate(key)));
+                        setIsDetailOpen(false);
+                        setIsRoutineOpen(false);
+                        setIsChatOpen(false);
+                        setFormMode("add");
+                      }}
+                      className="opacity-0 group-hover:opacity-100 transition-all duration-150 absolute top-2 right-2 flex h-6 w-6 items-center justify-center rounded-full bg-[#00A19B] text-white hover:bg-[#008984] hover:scale-110 shadow-md cursor-pointer z-10"
+                      title={`Add event on ${displayDate(key)}`}
+                      aria-label={`Add event on ${displayDate(key)}`}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
+                      </svg>
+                    </button>
                     <span className="day-number">{item.date.getDate()}</span>
                     {events.length > 0 && (
                       <div className="event-chips" aria-label="Events">
@@ -1696,25 +1715,32 @@ export default function Home() {
                     />
                   </label>
 
-                  <div className="form-actions mt-4">
+                  <div className="flex items-center gap-3 mt-6 pt-4 border-t border-[#17211f]/10 form-buttons">
                     <button
-                      className="form-button secondary"
-                      disabled={isSubmitting}
                       type="button"
                       onClick={closeForm}
+                      disabled={isSubmitting}
+                      className="flex-1 rounded-xl border border-[#17211f]/20 bg-white/80 py-3.5 px-4 text-sm md:text-base font-bold text-[#17211f] hover:bg-white hover:border-[#17211f]/40 transition-all cursor-pointer shadow-sm active:scale-[0.98] disabled:opacity-50"
                     >
                       Cancel
                     </button>
                     <button
-                      className="form-button primary"
-                      disabled={isSubmitting}
                       type="submit"
+                      disabled={isSubmitting}
+                      className="flex-1 rounded-xl bg-[#00A19B] py-3.5 px-4 text-sm md:text-base font-bold !text-white text-white shadow-md shadow-[#00A19B]/30 hover:bg-[#008984] hover:shadow-lg transition-all cursor-pointer active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
                     >
-                      {isSubmitting
-                        ? "Saving..."
-                        : formMode === "add"
-                          ? "Add event"
-                          : "Save changes"}
+                      {isSubmitting ? (
+                        <span className="!text-white text-white font-bold">Saving...</span>
+                      ) : formMode === "add" ? (
+                        <>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="white" viewBox="0 0 16 16" className="text-white shrink-0">
+                            <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
+                          </svg>
+                          <span className="!text-white text-white font-bold">Add Event</span>
+                        </>
+                      ) : (
+                        <span className="!text-white text-white font-bold">Save Changes</span>
+                      )}
                     </button>
                   </div>
                 </form>
