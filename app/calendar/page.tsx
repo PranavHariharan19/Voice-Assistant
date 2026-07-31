@@ -5,6 +5,27 @@ import { supabase } from "@/lib/supabase";
 import * as chrono from "chrono-node";
 import { useAuth } from "@/lib/auth-context";
 import { useRouter } from "next/navigation";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  MouseSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  DragStartEvent,
+  DragEndEvent,
+  DragOverlay,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 type CalendarEvent = {
   id: number | string;
@@ -164,6 +185,92 @@ function groupEvents(events: CalendarEvent[]) {
   }, {});
 }
 
+type RoutineTask = { id: string; text: string; time?: string; completed?: boolean; lastCompletedDate?: string };
+
+function SortableRoutineItem({
+  task,
+  onToggle,
+  onRemove,
+}: {
+  task: RoutineTask;
+  onToggle: (id: string) => void;
+  onRemove: (id: string) => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: task.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform ? { ...transform, x: 0 } : null),
+    transition,
+    zIndex: isDragging ? 50 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`group flex items-center justify-between gap-2 rounded-2xl border p-3 text-sm transition-colors duration-150 ${
+        task.completed
+          ? "border-[#17211f]/10 bg-[#f7f2ea]/50 text-[#17211f]/50 line-through"
+          : "border-[#17211f]/15 bg-white/70 text-[#17211f] shadow-sm hover:border-[#00A19B]/40"
+      } ${isDragging ? "shadow-xl ring-2 ring-[#00A19B] bg-white opacity-95 scale-[1.01] z-50" : ""}`}
+    >
+      <div className="flex items-center gap-2 flex-1 min-w-0">
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing text-[#17211f]/40 hover:text-[#00A19B] p-1 rounded transition-colors shrink-0 touch-none select-none"
+          title="Drag to reorder"
+          aria-label="Drag to reorder task"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+            <path d="M7 2a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm3 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0zM7 5a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm3 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0zM7 8a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm3 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0zM7 11a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm3 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0zM7 14a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm3 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/>
+          </svg>
+        </button>
+        <button
+          type="button"
+          onClick={() => onToggle(task.id)}
+          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-all ${
+            task.completed
+              ? "border-[#00A19B] bg-[#00A19B] text-white"
+              : "border-[#17211f]/30 bg-white hover:border-[#00A19B]"
+          }`}
+        >
+          {task.completed && (
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/>
+            </svg>
+          )}
+        </button>
+        <div className="flex flex-col min-w-0 flex-1">
+          <span className="font-medium truncate">{task.text}</span>
+          {task.time && (
+            <span className="text-[11px] font-semibold text-[#00A19B] opacity-90">{task.time}</span>
+          )}
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={() => onRemove(task.id)}
+        className="opacity-60 hover:opacity-100 text-red-500 transition-opacity p-1 cursor-pointer shrink-0"
+        title="Delete task"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+          <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+          <path fillRule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+        </svg>
+      </button>
+    </div>
+  );
+}
+
 export default function Home() {
   const { user, loading: authLoading, initialized, signOut } = useAuth();
   const router = useRouter();
@@ -217,8 +324,30 @@ export default function Home() {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
 
-  type RoutineTask = { id: string; text: string; time?: string; completed?: boolean; lastCompletedDate?: string };
   const [isRoutineOpen, setIsRoutineOpen] = useState(false);
+
+  const routineSensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 3,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleRoutineDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      const oldIndex = routineTasks.findIndex((t) => t.id === active.id);
+      const newIndex = routineTasks.findIndex((t) => t.id === over.id);
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const reordered = arrayMove(routineTasks, oldIndex, newIndex);
+        saveRoutineTasks(reordered);
+      }
+    }
+  };
   const [routineTasks, setRoutineTasks] = useState<RoutineTask[]>([]);
   const [newTaskText, setNewTaskText] = useState("");
   const [newTaskTime, setNewTaskTime] = useState("");
@@ -1413,7 +1542,7 @@ export default function Home() {
                   </button>
                 </form>
 
-                <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-0">
+                <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-0 relative">
                   {routineTasks.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full text-center opacity-50 space-y-3 py-8">
                       <svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" fill="currentColor" viewBox="0 0 16 16">
@@ -1422,51 +1551,25 @@ export default function Home() {
                       <p className="text-sm font-medium">Your daily routine is empty.<br/>Add daily tasks above to get started!</p>
                     </div>
                   ) : (
-                    routineTasks.map((task) => (
-                      <div
-                        key={task.id}
-                        className={`group flex items-center justify-between gap-3 rounded-2xl border p-3 text-sm transition-all ${
-                          task.completed
-                            ? "border-[#17211f]/10 bg-[#f7f2ea]/50 text-[#17211f]/50 line-through"
-                            : "border-[#17211f]/15 bg-white/70 text-[#17211f] shadow-sm hover:border-[#00A19B]/40"
-                        }`}
+                    <DndContext
+                      sensors={routineSensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={handleRoutineDragEnd}
+                    >
+                      <SortableContext
+                        items={routineTasks.map((t) => t.id)}
+                        strategy={verticalListSortingStrategy}
                       >
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <button
-                            type="button"
-                            onClick={() => handleToggleRoutineTask(task.id)}
-                            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-all ${
-                              task.completed
-                                ? "border-[#00A19B] bg-[#00A19B] text-white"
-                                : "border-[#17211f]/30 bg-white hover:border-[#00A19B]"
-                            }`}
-                          >
-                            {task.completed && (
-                              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
-                                <path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/>
-                              </svg>
-                            )}
-                          </button>
-                          <div className="flex flex-col min-w-0 flex-1">
-                            <span className="font-medium truncate">{task.text}</span>
-                            {task.time && (
-                              <span className="text-[11px] font-semibold text-[#00A19B] opacity-90">{task.time}</span>
-                            )}
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveRoutineTask(task.id)}
-                          className="opacity-60 hover:opacity-100 text-red-500 transition-opacity p-1 cursor-pointer"
-                          title="Delete task"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                            <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
-                            <path fillRule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
-                          </svg>
-                        </button>
-                      </div>
-                    ))
+                        {routineTasks.map((task) => (
+                          <SortableRoutineItem
+                            key={task.id}
+                            task={task}
+                            onToggle={handleToggleRoutineTask}
+                            onRemove={handleRemoveRoutineTask}
+                          />
+                        ))}
+                      </SortableContext>
+                    </DndContext>
                   )}
                 </div>
 
