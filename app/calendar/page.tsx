@@ -35,6 +35,7 @@ type CalendarEvent = {
   date: string;
   additionalInformation: string;
   tone: "mint" | "amber" | "rose" | "ink";
+  status: "pending" | "completed";
 };
 
 type EventFormValues = {
@@ -59,6 +60,7 @@ type EventRow = {
   event_date: string;
   event_time: string | null;
   additional_info: string | null;
+  status?: string | null;
 };
 
 const monthNames = [
@@ -167,6 +169,14 @@ function isDisplayDate(value: string) {
 }
 
 function mapEventRow(row: EventRow): CalendarEvent {
+  let savedStatus: "pending" | "completed" = "pending";
+  if (row.status === "completed" || row.status === "pending") {
+    savedStatus = row.status;
+  } else if (typeof window !== "undefined") {
+    const local = localStorage.getItem(`event_status_${row.event_id}`);
+    if (local === "completed") savedStatus = "completed";
+  }
+
   return {
     id: row.event_id,
     title: row.event_name,
@@ -175,6 +185,7 @@ function mapEventRow(row: EventRow): CalendarEvent {
     date: row.event_date,
     additionalInformation: row.additional_info ?? "",
     tone: "mint",
+    status: savedStatus,
   };
 }
 
@@ -486,11 +497,27 @@ export default function Home() {
     let isMounted = true;
 
     async function loadEvents() {
-      const { data, error } = await supabase
+      let data: any[] | null = null;
+      let error: any = null;
+
+      const res = await supabase
         .from("events")
-        .select("event_id,event_name,event_date,event_time,additional_info")
+        .select("event_id,event_name,event_date,event_time,additional_info,status")
         .eq("user_id", user?.id)
         .order("event_date", { ascending: true });
+
+      if (res.error) {
+        const fallbackRes = await supabase
+          .from("events")
+          .select("event_id,event_name,event_date,event_time,additional_info")
+          .eq("user_id", user?.id)
+          .order("event_date", { ascending: true });
+        data = fallbackRes.data;
+        error = fallbackRes.error;
+      } else {
+        data = res.data;
+        error = res.error;
+      }
 
       if (!isMounted) {
         return;
@@ -1096,6 +1123,29 @@ export default function Home() {
     }, 3000);
   }
 
+  async function updateEventStatus(eventId: string | number, eventDate: string, newStatus: "pending" | "completed") {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(`event_status_${eventId}`, newStatus);
+    }
+
+    setEventsByDate((current) => ({
+      ...current,
+      [eventDate]: (current[eventDate] ?? []).map((ev) =>
+        ev.id === eventId ? { ...ev, status: newStatus } : ev
+      ),
+    }));
+
+    try {
+      await supabase
+        .from("events")
+        .update({ status: newStatus })
+        .eq("event_id", eventId)
+        .eq("user_id", user?.id);
+    } catch (err) {
+      console.error("Could not update status in DB:", err);
+    }
+  }
+
   async function submitEventForm(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -1492,6 +1542,11 @@ export default function Home() {
                               });
                             }}
                           >
+                            {event.status === "completed" && (
+                              <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" fill="currentColor" viewBox="0 0 16 16" className="shrink-0 mr-1 text-white opacity-95">
+                                <path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/>
+                              </svg>
+                            )}
                             <span className="event-chip-name">{event.title}</span>
                             {event.id === copiedEventId && (
                               <span className="ml-1 rounded bg-white/30 px-1 py-0.2 text-[9px] font-extrabold uppercase text-white shrink-0">
@@ -1795,6 +1850,11 @@ export default function Home() {
                         isSelected={event.id === selectedEventId}
                         key={event.id}
                         onSelect={() => selectEvent(event)}
+                        showTickButton={true}
+                        onToggleStatus={() => {
+                          const nextStatus = event.status === "completed" ? "pending" : "completed";
+                          updateEventStatus(event.id, event.date, nextStatus);
+                        }}
                       />
                     ))
                   ) : (
@@ -1839,6 +1899,11 @@ export default function Home() {
                           isSelected={event.id === selectedEventId}
                           key={event.id}
                           onSelect={() => selectEvent(event)}
+                          showTickButton={true}
+                          onToggleStatus={() => {
+                            const nextStatus = event.status === "completed" ? "pending" : "completed";
+                            updateEventStatus(event.id, event.date, nextStatus);
+                          }}
                         />
                       ))
                     ) : (
@@ -1866,6 +1931,11 @@ export default function Home() {
                           isSelected={event.id === selectedEventId}
                           key={event.id}
                           onSelect={() => selectEvent(event)}
+                          showTickButton={true}
+                          onToggleStatus={() => {
+                            const nextStatus = event.status === "completed" ? "pending" : "completed";
+                            updateEventStatus(event.id, event.date, nextStatus);
+                          }}
                         />
                       ))
                     ) : (
@@ -1976,6 +2046,20 @@ export default function Home() {
               </svg>
               <span>Details</span>
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                const nextStatus = popupState.event.status === "completed" ? "pending" : "completed";
+                updateEventStatus(popupState.event.id, popupState.event.date, nextStatus);
+                setPopupState(null);
+              }}
+              className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-bold text-[#00A19B] hover:bg-[#00A19B] hover:text-white transition-all cursor-pointer"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/>
+              </svg>
+              <span>{popupState.event.status === "completed" ? "Mark as pending" : "Mark as completed"}</span>
+            </button>
           </div>
           <div className="mx-auto -mt-1 h-2 w-2 rotate-45 border-b border-r border-[#17211f]/15 bg-[#f7f2ea]" />
         </div>
@@ -2005,6 +2089,21 @@ function EventDetailsPanel({
 
       <dl className="detail-list">
         <div>
+          <dt className="sr-only">Status</dt>
+          <dd className="capitalize flex items-center justify-between">
+            <span>Status</span>
+            <span
+              className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                event.status === "completed"
+                  ? "bg-[#00A19B] text-white border border-[#00A19B]"
+                  : "bg-[#00A19B]/10 text-[#00A19B] border border-[#00A19B]/20"
+              }`}
+            >
+              {event.status || "pending"}
+            </span>
+          </dd>
+        </div>
+        <div>
           <dt className="sr-only">Date</dt>
           <dd>{displayDate(event.date)}</dd>
         </div>
@@ -2030,37 +2129,95 @@ function EventCard({
   inverted = false,
   isSelected = false,
   onSelect,
+  onToggleStatus,
+  showTickButton = false,
 }: {
   event: CalendarEvent;
   inverted?: boolean;
   isSelected?: boolean;
   onSelect?: () => void;
+  onToggleStatus?: (e: React.MouseEvent) => void;
+  showTickButton?: boolean;
 }) {
+  const isCompleted = event.status === "completed";
+
   const content = (
-    <>
-      <div>
-        {event.time && <p className="text-sm font-bold">{event.time}</p>}
-        <h3 className="mt-1 text-base font-semibold">{event.title}</h3>
+    <div className="flex items-center justify-between w-full gap-3">
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-1">
+          {event.time && <p className="text-xs font-bold text-[#17211f]/80 shrink-0">{event.time}</p>}
+          <span
+            className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize shrink-0 ${
+              isCompleted
+                ? "bg-[#00A19B] text-white flex items-center gap-1 font-semibold"
+                : "bg-[#00A19B]/10 text-[#00A19B] border border-[#00A19B]/20 font-bold"
+            }`}
+          >
+            {event.status || "pending"}
+          </span>
+        </div>
+        
+        <div className="flex items-center gap-1.5 min-w-0">
+          {isCompleted && (
+            <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#00A19B] text-white shadow-sm">
+              <svg className="w-2.5 h-2.5 fill-current" viewBox="0 0 16 16">
+                <path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z" />
+              </svg>
+            </span>
+          )}
+          <h3 className={`text-base truncate ${isCompleted ? "text-[#17211f]/80 font-medium" : "font-bold text-[#17211f]"}`}>
+            {event.title}
+          </h3>
+        </div>
+
+        {event.location && <p className="text-xs opacity-70 truncate mt-0.5">{event.location}</p>}
       </div>
-      {event.location && <p className="text-sm opacity-70">{event.location}</p>}
-    </>
+
+      {showTickButton && onToggleStatus && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleStatus(e);
+          }}
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-all cursor-pointer ${
+            isCompleted
+              ? "border-[#00A19B] bg-[#00A19B] text-white shadow-md hover:bg-[#008984]"
+              : "border-[#00A19B]/30 bg-white/80 text-[#00A19B]/50 hover:border-[#00A19B] hover:bg-[#00A19B]/10 hover:text-[#00A19B]"
+          }`}
+          title={isCompleted ? "Completed (click to toggle)" : "Mark as completed"}
+          aria-label={isCompleted ? "Completed" : "Mark as completed"}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+            <path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/>
+          </svg>
+        </button>
+      )}
+    </div>
   );
+
+  const cardClasses = `event-card ${event.tone} ${isSelected ? "selected" : ""} ${
+    isCompleted ? "completed bg-[#00A19B]/10 border-[#00A19B]/30 opacity-85" : "opacity-100"
+  } ${inverted ? "inverted" : ""}`;
 
   if (onSelect) {
     return (
-      <button
-        className={`event-card ${event.tone} ${isSelected ? "selected" : ""}`}
-        type="button"
+      <div
+        className={`${cardClasses} cursor-pointer`}
+        role="button"
+        tabIndex={0}
         onClick={onSelect}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onSelect();
+          }
+        }}
       >
         {content}
-      </button>
+      </div>
     );
   }
 
-  return (
-    <article className={`event-card ${event.tone} ${inverted ? "inverted" : ""}`}>
-      {content}
-    </article>
-  );
+  return <article className={cardClasses}>{content}</article>;
 }
