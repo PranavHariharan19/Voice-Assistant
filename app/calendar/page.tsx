@@ -35,7 +35,7 @@ type CalendarEvent = {
   date: string;
   additionalInformation: string;
   tone: "mint" | "amber" | "rose" | "ink";
-  status: "pending" | "completed";
+  status: "pending" | "completed" | "missed";
 };
 
 type EventFormValues = {
@@ -169,12 +169,12 @@ function isDisplayDate(value: string) {
 }
 
 function mapEventRow(row: EventRow): CalendarEvent {
-  let savedStatus: "pending" | "completed" = "pending";
-  if (row.status === "completed" || row.status === "pending") {
+  let savedStatus: "pending" | "completed" | "missed" = "pending";
+  if (row.status === "completed" || row.status === "missed" || row.status === "pending") {
     savedStatus = row.status;
   } else if (typeof window !== "undefined") {
     const local = localStorage.getItem(`event_status_${row.event_id}`);
-    if (local === "completed") savedStatus = "completed";
+    if (local === "completed" || local === "missed") savedStatus = local;
   }
 
   return {
@@ -1123,7 +1123,7 @@ export default function Home() {
     }, 3000);
   }
 
-  async function updateEventStatus(eventId: string | number, eventDate: string, newStatus: "pending" | "completed") {
+  async function updateEventStatus(eventId: string | number, eventDate: string, newStatus: "pending" | "completed" | "missed") {
     if (typeof window !== "undefined") {
       localStorage.setItem(`event_status_${eventId}`, newStatus);
     }
@@ -1521,7 +1521,7 @@ export default function Home() {
 
                           return (
                           <div
-                            className={`event-chip ${event.tone} ${isDimmer ? 'opacity-30' : 'opacity-100'} ${
+                            className={`event-chip ${event.status === "missed" ? "missed" : event.tone} ${isDimmer ? 'opacity-30' : 'opacity-100'} ${
                               event.id === copiedEventId ? 'ring-2 ring-[#00A19B] animate-bounce shadow-md' : ''
                             }`}
                             key={event.id}
@@ -1545,6 +1545,11 @@ export default function Home() {
                             {event.status === "completed" && (
                               <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" fill="currentColor" viewBox="0 0 16 16" className="shrink-0 mr-1 text-white opacity-95">
                                 <path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/>
+                              </svg>
+                            )}
+                            {event.status === "missed" && (
+                              <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" fill="currentColor" viewBox="0 0 16 16" className="shrink-0 mr-1 text-white opacity-95">
+                                <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
                               </svg>
                             )}
                             <span className="event-chip-name">{event.title}</span>
@@ -1855,6 +1860,10 @@ export default function Home() {
                           const nextStatus = event.status === "completed" ? "pending" : "completed";
                           updateEventStatus(event.id, event.date, nextStatus);
                         }}
+                        onToggleMissed={() => {
+                          const nextStatus = event.status === "missed" ? "pending" : "missed";
+                          updateEventStatus(event.id, event.date, nextStatus);
+                        }}
                       />
                     ))
                   ) : (
@@ -1904,6 +1913,10 @@ export default function Home() {
                             const nextStatus = event.status === "completed" ? "pending" : "completed";
                             updateEventStatus(event.id, event.date, nextStatus);
                           }}
+                          onToggleMissed={() => {
+                            const nextStatus = event.status === "missed" ? "pending" : "missed";
+                            updateEventStatus(event.id, event.date, nextStatus);
+                          }}
                         />
                       ))
                     ) : (
@@ -1934,6 +1947,10 @@ export default function Home() {
                           showTickButton={true}
                           onToggleStatus={() => {
                             const nextStatus = event.status === "completed" ? "pending" : "completed";
+                            updateEventStatus(event.id, event.date, nextStatus);
+                          }}
+                          onToggleMissed={() => {
+                            const nextStatus = event.status === "missed" ? "pending" : "missed";
                             updateEventStatus(event.id, event.date, nextStatus);
                           }}
                         />
@@ -2060,6 +2077,20 @@ export default function Home() {
               </svg>
               <span>{popupState.event.status === "completed" ? "Mark as pending" : "Mark as completed"}</span>
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                const nextStatus = popupState.event.status === "missed" ? "pending" : "missed";
+                updateEventStatus(popupState.event.id, popupState.event.date, nextStatus);
+                setPopupState(null);
+              }}
+              className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-bold text-[#e06a67] hover:bg-[#e06a67] hover:text-white transition-all cursor-pointer"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
+              </svg>
+              <span>{popupState.event.status === "missed" ? "Mark as pending" : "Mark as missed"}</span>
+            </button>
           </div>
           <div className="mx-auto -mt-1 h-2 w-2 rotate-45 border-b border-r border-[#17211f]/15 bg-[#f7f2ea]" />
         </div>
@@ -2096,6 +2127,8 @@ function EventDetailsPanel({
               className={`text-xs font-bold px-2.5 py-1 rounded-full ${
                 event.status === "completed"
                   ? "bg-[#00A19B] text-white border border-[#00A19B]"
+                  : event.status === "missed"
+                  ? "bg-[#e06a67] text-white border border-[#e06a67]"
                   : "bg-[#00A19B]/10 text-[#00A19B] border border-[#00A19B]/20"
               }`}
             >
@@ -2130,6 +2163,7 @@ function EventCard({
   isSelected = false,
   onSelect,
   onToggleStatus,
+  onToggleMissed,
   showTickButton = false,
 }: {
   event: CalendarEvent;
@@ -2137,9 +2171,11 @@ function EventCard({
   isSelected?: boolean;
   onSelect?: () => void;
   onToggleStatus?: (e: React.MouseEvent) => void;
+  onToggleMissed?: (e: React.MouseEvent) => void;
   showTickButton?: boolean;
 }) {
   const isCompleted = event.status === "completed";
+  const isMissed = event.status === "missed";
 
   const content = (
     <div className="flex items-center justify-between w-full gap-3">
@@ -2150,6 +2186,8 @@ function EventCard({
             className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize shrink-0 ${
               isCompleted
                 ? "bg-[#00A19B] text-white flex items-center gap-1 font-semibold"
+                : isMissed
+                ? "bg-[#e06a67] text-white flex items-center gap-1 font-semibold"
                 : "bg-[#00A19B]/10 text-[#00A19B] border border-[#00A19B]/20 font-bold"
             }`}
           >
@@ -2165,7 +2203,14 @@ function EventCard({
               </svg>
             </span>
           )}
-          <h3 className={`text-base truncate ${isCompleted ? "text-[#17211f]/80 font-medium" : "font-bold text-[#17211f]"}`}>
+          {isMissed && (
+            <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#e06a67] text-white shadow-sm">
+              <svg className="w-2.5 h-2.5 fill-current" viewBox="0 0 16 16">
+                <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
+              </svg>
+            </span>
+          )}
+          <h3 className={`text-base truncate ${isCompleted ? "text-[#17211f]/80 font-medium line-through opacity-80" : isMissed ? "text-[#b24845] font-bold opacity-90" : "font-bold text-[#17211f]"}`}>
             {event.title}
           </h3>
         </div>
@@ -2173,31 +2218,60 @@ function EventCard({
         {event.location && <p className="text-xs opacity-70 truncate mt-0.5">{event.location}</p>}
       </div>
 
-      {showTickButton && onToggleStatus && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleStatus(e);
-          }}
-          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-all cursor-pointer ${
-            isCompleted
-              ? "border-[#00A19B] bg-[#00A19B] text-white shadow-md hover:bg-[#008984]"
-              : "border-[#00A19B]/30 bg-white/80 text-[#00A19B]/50 hover:border-[#00A19B] hover:bg-[#00A19B]/10 hover:text-[#00A19B]"
-          }`}
-          title={isCompleted ? "Completed (click to toggle)" : "Mark as completed"}
-          aria-label={isCompleted ? "Completed" : "Mark as completed"}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
-            <path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/>
-          </svg>
-        </button>
+      {showTickButton && (
+        <div className="flex items-center gap-1.5 shrink-0">
+          {onToggleStatus && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleStatus(e);
+              }}
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-all cursor-pointer ${
+                isCompleted
+                  ? "border-[#00A19B] bg-[#00A19B] text-white shadow-md hover:bg-[#008984]"
+                  : "border-[#00A19B]/30 bg-white/80 text-[#00A19B]/50 hover:border-[#00A19B] hover:bg-[#00A19B]/10 hover:text-[#00A19B]"
+              }`}
+              title={isCompleted ? "Completed (click to mark pending)" : "Mark as completed"}
+              aria-label={isCompleted ? "Completed" : "Mark as completed"}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/>
+              </svg>
+            </button>
+          )}
+
+          {onToggleMissed && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleMissed(e);
+              }}
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-all cursor-pointer ${
+                isMissed
+                  ? "border-[#e06a67] bg-[#e06a67] text-white shadow-md hover:bg-[#d55b58]"
+                  : "border-[#e06a67]/30 bg-white/80 text-[#e06a67]/70 hover:border-[#e06a67] hover:bg-[#e06a67]/10 hover:text-[#e06a67]"
+              }`}
+              title={isMissed ? "Missed (click to mark pending)" : "Mark as missed"}
+              aria-label={isMissed ? "Missed" : "Mark as missed"}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
+              </svg>
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
 
   const cardClasses = `event-card ${event.tone} ${isSelected ? "selected" : ""} ${
-    isCompleted ? "completed bg-[#00A19B]/10 border-[#00A19B]/30 opacity-85" : "opacity-100"
+    isCompleted
+      ? "completed bg-[#00A19B]/10 border-[#00A19B]/30 opacity-85"
+      : isMissed
+      ? "missed"
+      : "opacity-100"
   } ${inverted ? "inverted" : ""}`;
 
   if (onSelect) {

@@ -190,6 +190,11 @@ button {
   background: var(--ink);
 }
 
+.event-chip.missed {
+  background: #e06a67;
+  box-shadow: 0 2px 6px rgba(224, 106, 103, 0.25);
+}
+
 .event-chip-name {
   white-space: nowrap;
   overflow: hidden;
@@ -272,6 +277,13 @@ button {
 
 .event-card.ink {
   border-left-color: var(--ink);
+}
+
+.event-card.missed {
+  border-left-color: #e06a67;
+  border-color: rgba(224, 106, 103, 0.3);
+  background: linear-gradient(135deg, rgba(224, 106, 103, 0.14) 0%, rgba(224, 106, 103, 0.03) 100%);
+  box-shadow: 0 4px 14px rgba(224, 106, 103, 0.08);
 }
 
 .event-card.inverted {
