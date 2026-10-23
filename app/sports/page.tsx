@@ -24,7 +24,7 @@ import { CSS } from "@dnd-kit/utilities";
 
 type FavoriteEntity = {
   id: string;
-  user_id: string;
+  user_id?: string | null;
   sport: string;
   entity_name: string;
 };
@@ -127,10 +127,23 @@ export default function SportsPage() {
 
     let isMounted = true;
     async function loadEntities() {
-      const { data, error } = await supabase
+      // 1. Try querying entities matching the user or global entities (user_id IS NULL)
+      let { data, error } = await supabase
         .from("favorite_entities")
         .select("id, user_id, sport, entity_name")
-        .eq("user_id", user?.id);
+        .or(`user_id.eq.${user?.id},user_id.is.null`);
+
+      // 2. If no entities returned or error occurred, fallback to fetching all entities
+      if (error || !data || data.length === 0) {
+        const fallback = await supabase
+          .from("favorite_entities")
+          .select("id, user_id, sport, entity_name");
+        
+        if (!fallback.error && fallback.data && fallback.data.length > 0) {
+          data = fallback.data;
+          error = null;
+        }
+      }
 
       if (!isMounted) return;
 
@@ -139,23 +152,23 @@ export default function SportsPage() {
       } else {
         const withIds = (data || []).map((item) => ({
           ...item,
-          // Use the real uuid for DB operations, keeping string id for DnD if needed or just use real id.
-          // Wait, DndKit needs a string id. The real id is a UUID string.
-          id: item.id,
+          id: String(item.id),
         }));
         
         try {
           const savedOrderStr = localStorage.getItem("favoriteTeamsOrder");
           if (savedOrderStr) {
             const savedOrder = JSON.parse(savedOrderStr);
-            withIds.sort((a, b) => {
-              const indexA = savedOrder.indexOf(a.id);
-              const indexB = savedOrder.indexOf(b.id);
-              if (indexA === -1 && indexB === -1) return 0;
-              if (indexA === -1) return 1;
-              if (indexB === -1) return -1;
-              return indexA - indexB;
-            });
+            if (Array.isArray(savedOrder)) {
+              withIds.sort((a, b) => {
+                const indexA = savedOrder.indexOf(a.id);
+                const indexB = savedOrder.indexOf(b.id);
+                if (indexA === -1 && indexB === -1) return 0;
+                if (indexA === -1) return 1;
+                if (indexB === -1) return -1;
+                return indexA - indexB;
+              });
+            }
           }
         } catch(e) {
           console.error("Error reading order from localStorage", e);
@@ -218,8 +231,8 @@ export default function SportsPage() {
   }, [selectedEntity]);
 
   const filteredEntities = entities.filter((entity) => {
-    const matchesFilter = filter === "all" || entity.sport.toLowerCase() === filter;
-    const matchesSearch = entity.entity_name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesFilter = filter === "all" || entity.sport?.toLowerCase() === filter;
+    const matchesSearch = (entity.entity_name || "").toLowerCase().includes(searchQuery.toLowerCase());
     return matchesFilter && matchesSearch;
   });
 
@@ -302,7 +315,7 @@ export default function SportsPage() {
   }
 
   let filteredSchedule = scheduleData || [];
-  if (selectedEntity?.entity_name.toLowerCase() === 'icc') {
+  if (selectedEntity?.entity_name?.toLowerCase() === 'icc') {
     filteredSchedule = filteredSchedule.filter((match: any) => {
       const isWomen = match.title.toLowerCase().includes('women');
       return iccGender === 'women' ? isWomen : !isWomen;
@@ -503,7 +516,7 @@ export default function SportsPage() {
                 <div className="flex items-start justify-between mb-6">
                   <div>
                     <h2 className="text-2xl font-bold text-[#17211f]">Upcoming Schedule</h2>
-                    {selectedEntity.entity_name.toLowerCase() === 'icc' && (
+                    {selectedEntity?.entity_name?.toLowerCase() === 'icc' && (
                        <div className="flex items-center gap-2 mt-3 bg-[#17211f]/5 p-1 rounded-lg w-fit">
                          <button 
                            onClick={() => setIccGender('men')}

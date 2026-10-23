@@ -1,5 +1,8 @@
+import path from "path";
 import type { NextConfig } from "next";
 import withPWAInit from "@ducanh2912/next-pwa";
+
+const projectRoot = typeof __dirname !== "undefined" ? __dirname : process.cwd();
 
 const withPWA = withPWAInit({
   dest: "public",
@@ -13,7 +16,10 @@ const withPWA = withPWAInit({
 });
 
 const nextConfig: NextConfig = {
-  turbopack: {},
+  turbopack: {
+    root: path.resolve(projectRoot),
+  },
+  outputFileTracingRoot: path.resolve(projectRoot),
 };
 
 export default withPWA(nextConfig);
