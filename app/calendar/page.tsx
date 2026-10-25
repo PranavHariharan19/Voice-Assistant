@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState, useRef } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import * as chrono from "chrono-node";
 import { useAuth } from "@/lib/auth-context";
@@ -290,7 +291,16 @@ export default function Home() {
     () => new Date(today.getFullYear(), today.getMonth(), 1),
   );
   const [selectedDate, setSelectedDate] = useState(today);
-  const [eventsByDate, setEventsByDate] = useState(() => buildEvents());
+  const [eventsByDate, setEventsByDate] = useState<Record<string, CalendarEvent[]>>(() => buildEvents());
+
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem("cached_calendar_events");
+      if (cached) {
+        setEventsByDate(JSON.parse(cached));
+      }
+    } catch {}
+  }, []);
   const [selectedEventId, setSelectedEventId] = useState<number | string | null>(
     null,
   );
@@ -492,6 +502,13 @@ export default function Home() {
     }
   }, [user, initialized, router]);
 
+  // Warm-up sports and vault route bundles in background for instant navigation
+  useEffect(() => {
+    router.prefetch("/sports");
+    router.prefetch("/vault");
+    router.prefetch("/vault/dashboard");
+  }, [router]);
+
   useEffect(() => {
     if (!user) return;
     let isMounted = true;
@@ -529,7 +546,11 @@ export default function Home() {
       }
 
       const events = (data ?? []).map((row) => mapEventRow(row as EventRow));
-      setEventsByDate(groupEvents(events));
+      const grouped = groupEvents(events);
+      setEventsByDate(grouped);
+      try {
+        localStorage.setItem("cached_calendar_events", JSON.stringify(grouped));
+      } catch {}
     }
 
     loadEvents();
@@ -1993,29 +2014,29 @@ export default function Home() {
                       <span>Routine</span>
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={() => router.push('/vault')}
-                      className="flex flex-col items-center justify-center gap-1.5 p-2.5 rounded-2xl border border-[#17211f]/10 bg-white/60 text-[#17211f] hover:bg-white hover:border-[#00A19B]/40 transition-all text-xs font-semibold shadow-sm cursor-pointer"
+                    <Link
+                      href="/vault"
+                      prefetch={true}
+                      className="flex flex-col items-center justify-center gap-1.5 p-2.5 rounded-2xl border border-[#17211f]/10 bg-white/60 text-[#17211f] hover:bg-white hover:border-[#00A19B]/40 active:scale-95 transition-all text-xs font-semibold shadow-sm cursor-pointer"
                       title="Vault"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
                         <path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2zm3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2zM5 8h6a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/>
                       </svg>
                       <span>Vault</span>
-                    </button>
+                    </Link>
 
-                    <button
-                      type="button"
-                      onClick={() => router.push('/sports')}
-                      className="flex flex-col items-center justify-center gap-1.5 p-2.5 rounded-2xl border border-[#17211f]/10 bg-white/60 text-[#17211f] hover:bg-white hover:border-[#00A19B]/40 transition-all text-xs font-semibold shadow-sm cursor-pointer"
+                    <Link
+                      href="/sports"
+                      prefetch={true}
+                      className="flex flex-col items-center justify-center gap-1.5 p-2.5 rounded-2xl border border-[#17211f]/10 bg-white/60 text-[#17211f] hover:bg-white hover:border-[#00A19B]/40 active:scale-95 transition-all text-xs font-semibold shadow-sm cursor-pointer"
                       title="Sports"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
                         <path fillRule="evenodd" d="M8 0C3.584 0 0 3.584 0 8s3.584 8 8 8c4.408 0 8-3.584 8-8s-3.584-8-8-8m4.015 2.505c.611.576 1.123 1.271 1.506 2.046-.574-.271-1.226-.45-1.921-.518a21 21 0 0 0-1.782-2.585q.412-.047.83-.047c.48 0 .943.037 1.367.104zM5.564 1.346c.38-.184.786-.328 1.21-.428a22 22 0 0 1 1.636 2.552q-.912.18-1.801.442a23 23 0 0 0-1.045-2.566zm-1.576.993c.404-.37.854-.691 1.341-.955a24 24 0 0 1 1.056 2.583q-.991.31-1.942.715a20 20 0 0 1-.455-2.343zM1.085 8.163q.983-.178 1.954-.265a22 22 0 0 1 1.706-2.571 20 20 0 0 1-.952-2.02 6.9 6.9 0 0 0-2.708 4.856zm1.182 2.656q.952-.394 1.867-.88a21 21 0 0 0 1.278 2.041 6.9 6.9 0 0 0-3.145-1.161zm4.846 4.095q-.89-.92-1.636-1.961a22 22 0 0 0-1.39-2.124 23 23 0 0 0 1.968-.908q.95 2.106 1.952 4.062a6.9 6.9 0 0 0-.894.931M8.91 14.881q-.958-1.996-1.87-4.108c.55-.246 1.135-.461 1.758-.638q1.493 2.193 2.764 4.542a6.9 6.9 0 0 0-2.652.204zm3.435-.78q-1.222-2.28-2.668-4.425a23 23 0 0 1 2.378-.456 21 21 0 0 0 1.892 3.659 6.9 6.9 0 0 0-1.602 1.222z"/>
                       </svg>
                       <span>Sports</span>
-                    </button>
+                    </Link>
                   </div>
                 </section>
 

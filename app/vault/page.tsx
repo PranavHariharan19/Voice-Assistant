@@ -8,26 +8,39 @@ import { getVaultStatus, setupVault, verifyVault } from "./actions";
 
 export default function VaultPage() {
   const router = useRouter();
-  const [status, setStatus] = useState<"loading" | "needs_setup" | "ready" | "unauthorized">("loading");
+  const [status, setStatus] = useState<"loading" | "needs_setup" | "ready" | "unauthorized">("ready");
   const [error, setError] = useState<string | null>(null);
   const [loadingAction, setLoadingAction] = useState(false);
 
   useEffect(() => {
+    try {
+      const cached = localStorage.getItem("vault_setup_status");
+      if (cached === "needs_setup" || cached === "ready") {
+        setStatus(cached as any);
+      }
+    } catch {}
+    router.prefetch("/vault/dashboard");
     getVaultStatus().then((res) => {
-      setStatus(res.status as "needs_setup" | "ready" | "unauthorized");
+      if (res.status && res.status !== "loading") {
+        setStatus(res.status as "needs_setup" | "ready" | "unauthorized");
+        if (res.status === "ready" || res.status === "needs_setup") {
+          localStorage.setItem("vault_setup_status", res.status);
+        }
+      }
     });
-  }, []);
-
-  if (status === "loading") {
-    return (
-      <div className="flex h-screen w-screen items-center justify-center bg-[#E4DDD3]">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#00A19B] border-t-transparent"></div>
-      </div>
-    );
-  }
+  }, [router]);
 
   if (status === "unauthorized") {
-    return <div className="p-10 text-center">Unauthorized. Please log in.</div>;
+    return (
+      <div className="relative min-h-screen flex items-center justify-center bg-[#E4DDD3]">
+        <div className="bg-white/70 backdrop-blur-2xl border border-[#17211F]/10 rounded-[32px] p-8 shadow-xl max-w-md w-full mx-4 text-center">
+          <p className="font-bold text-[#17211F]">Unauthorized. Please log in.</p>
+          <Link href="/" prefetch={true} className="mt-4 inline-block text-sm font-bold text-[#00A19B]">
+            Return to Login
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -55,12 +68,20 @@ export default function VaultPage() {
       if (status === "needs_setup") {
         res = await setupVault(newFormData);
         if (res?.success) {
-          window.location.reload(); // Reload to show the enter password screen
+          localStorage.setItem("vault_setup_status", "ready");
+          setStatus("ready");
+          setError(null);
         }
       } else {
         res = await verifyVault(newFormData);
         if (res?.success) {
+          if (res.items) {
+            try {
+              sessionStorage.setItem("vault_cached_items", JSON.stringify(res.items));
+            } catch {}
+          }
           router.push('/vault/dashboard');
+          return;
         }
       }
 
@@ -95,6 +116,8 @@ export default function VaultPage() {
             <label className="text-xs font-bold text-[#17211F]/60 uppercase ml-1">Master Password</label>
             <input
               required
+              autoFocus
+              autoComplete="current-password"
               name="password"
               type="password"
               placeholder="••••••••"
@@ -111,13 +134,18 @@ export default function VaultPage() {
           <button
             disabled={loadingAction}
             type="submit"
-            className="w-full bg-[#00A19B] text-white font-bold py-4 rounded-2xl shadow-[0_12px_28px_rgba(0,161,155,0.28)] hover:-translate-y-0.5 transition-all disabled:opacity-50"
+            className="w-full bg-[#00A19B] text-white font-bold py-4 rounded-2xl shadow-[0_12px_28px_rgba(0,161,155,0.28)] hover:-translate-y-0.5 active:scale-98 transition-all disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
           >
-            {loadingAction ? "Processing..." : status === "needs_setup" ? "Set Password" : "Unlock Vault"}
+            {loadingAction ? (
+              <>
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                <span>Unlocking...</span>
+              </>
+            ) : status === "needs_setup" ? "Set Password" : "Unlock Vault"}
           </button>
         </form>
         <div className="mt-6 text-center">
-          <Link href="/calendar" className="text-sm font-bold text-[#17211F]/60 hover:text-[#00A19B] transition-colors">
+          <Link href="/calendar" prefetch={true} className="text-sm font-bold text-[#17211F]/60 hover:text-[#00A19B] transition-colors active:scale-95 inline-block">
             Return to Calendar
           </Link>
         </div>

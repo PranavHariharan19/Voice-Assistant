@@ -25,16 +25,15 @@ async function getSupabase() {
 
 export async function getVaultStatus() {
   const supabase = await getSupabase()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { status: 'unauthorized' }
+  const [userRes, settingsRes] = await Promise.all([
+    supabase.auth.getUser(),
+    supabase.from('vault_settings').select('master_password').single()
+  ])
 
-  const { data, error } = await supabase
-    .from('vault_settings')
-    .select('master_password')
-    .eq('user_id', user.id)
-    .single()
+  if (!userRes.data?.user) return { status: 'unauthorized' }
 
-  if (error || !data || !data.master_password) {
+  const data = settingsRes.data
+  if (settingsRes.error || !data || !data.master_password) {
     return { status: 'needs_setup' }
   }
   return { status: 'ready' }
@@ -69,16 +68,16 @@ export async function verifyVault(formData: FormData) {
     if (!password) return { error: 'Password required' }
 
     const supabase = await getSupabase()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { error: 'Unauthorized' }
+    const [userRes, settingsRes, itemsRes] = await Promise.all([
+      supabase.auth.getUser(),
+      supabase.from('vault_settings').select('master_password').single(),
+      supabase.from('vault_items').select('*').order('created_at', { ascending: false })
+    ])
 
-    const { data, error } = await supabase
-      .from('vault_settings')
-      .select('master_password')
-      .eq('user_id', user.id)
-      .single()
+    if (!userRes.data?.user) return { error: 'Unauthorized' }
 
-    if (error || !data) {
+    const data = settingsRes.data
+    if (settingsRes.error || !data) {
       return { error: 'Vault not set up' }
     }
 
@@ -86,7 +85,7 @@ export async function verifyVault(formData: FormData) {
       return { error: 'Incorrect master password' }
     }
 
-    return { success: true }
+    return { success: true, items: itemsRes.data || [] }
   } catch (err: any) {
     return { error: err.message || 'Internal Server Error in verifyVault' }
   }
@@ -95,17 +94,15 @@ export async function verifyVault(formData: FormData) {
 export async function getVaultItems() {
   try {
     const supabase = await getSupabase()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { error: 'Unauthorized' }
+    const [userRes, itemsRes] = await Promise.all([
+      supabase.auth.getUser(),
+      supabase.from('vault_items').select('*').order('created_at', { ascending: false })
+    ])
 
-    const { data, error } = await supabase
-      .from('vault_items')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
+    if (!userRes.data?.user) return { error: 'Unauthorized' }
 
-    if (error) return { error: error.message }
-    return { items: data || [] }
+    if (itemsRes.error) return { error: itemsRes.error.message }
+    return { items: itemsRes.data || [] }
   } catch (err: any) {
     return { error: err.message || 'Internal Server Error' }
   }

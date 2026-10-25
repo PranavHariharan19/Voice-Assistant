@@ -25,6 +25,8 @@ export default function LoginPage() {
       }
     }
 
+    router.prefetch("/calendar");
+
     if (user) {
       router.push("/calendar");
     }

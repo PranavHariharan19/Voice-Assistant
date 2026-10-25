@@ -21,6 +21,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
+    // Read local cache immediately upon hydration to avoid delays
+    try {
+      const keys = Object.keys(localStorage);
+      const authKey = keys.find((k) => k.startsWith("sb-") && k.endsWith("-auth-token"));
+      if (authKey) {
+        const item = localStorage.getItem(authKey);
+        if (item) {
+          const parsed = JSON.parse(item);
+          if (parsed?.user) {
+            setSession(parsed);
+            setUser(parsed.user);
+            setLoading(false);
+            setInitialized(true);
+          }
+        }
+      }
+    } catch {}
+
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);

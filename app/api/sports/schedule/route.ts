@@ -441,11 +441,18 @@ export async function GET(request: NextRequest) {
       schedule = [];
     }
 
-    return NextResponse.json({
-      provider,
-      external_id,
-      schedule
-    });
+    return NextResponse.json(
+      {
+        provider,
+        external_id,
+        schedule
+      },
+      {
+        headers: {
+          "Cache-Control": "public, max-age=180, s-maxage=300, stale-while-revalidate=600"
+        }
+      }
+    );
 
   } catch (e) {
     console.error("Error fetching schedule data:", e);

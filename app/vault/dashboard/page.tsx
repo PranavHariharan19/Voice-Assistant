@@ -51,14 +51,26 @@ export default function VaultDashboard() {
   const filteredItems = items.filter(item => item.title.toLowerCase().includes(searchQuery.toLowerCase()));
 
   useEffect(() => {
-    loadItems();
+    let hasCached = false;
+    try {
+      const cached = sessionStorage.getItem("vault_cached_items");
+      if (cached) {
+        setItems(JSON.parse(cached));
+        setLoading(false);
+        hasCached = true;
+      }
+    } catch {}
+    loadItems(hasCached);
   }, []);
 
-  async function loadItems() {
-    setLoading(true);
+  async function loadItems(silent = false) {
+    if (!silent) setLoading(true);
     const res = await getVaultItems();
     if (res.items) {
       setItems(res.items);
+      try {
+        sessionStorage.setItem("vault_cached_items", JSON.stringify(res.items));
+      } catch {}
     }
     setLoading(false);
   }
@@ -97,7 +109,7 @@ export default function VaultDashboard() {
         setCreateError(res.error);
       } else {
         setShowCreateModal(false);
-        loadItems();
+        loadItems(true);
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
@@ -195,7 +207,7 @@ export default function VaultDashboard() {
         setEditError(res.error);
       } else {
         setEditItem(null);
-        loadItems();
+        loadItems(true);
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
@@ -207,14 +219,12 @@ export default function VaultDashboard() {
 
   async function confirmDelete() {
     if (!itemToDelete) return;
-    setLoading(true);
     const res = await deleteVaultItem(itemToDelete.id);
     if (res.error) {
       alert("Failed to delete: " + res.error);
-      setLoading(false);
     } else {
       setItemToDelete(null);
-      loadItems();
+      loadItems(true);
     }
   }
 
@@ -297,7 +307,7 @@ export default function VaultDashboard() {
     // Clear input
     e.target.value = '';
     
-    await loadItems();
+    await loadItems(true);
     setIsRestoring(false);
   }
 
@@ -336,7 +346,7 @@ export default function VaultDashboard() {
               disabled={isRestoring}
             />
           </label>
-          <Link href="/calendar" className="text-[#17211F]/60 font-bold hover:text-[#00A19B] transition">
+          <Link href="/calendar" prefetch={true} className="text-[#17211F]/60 font-bold hover:text-[#00A19B] transition active:scale-95 inline-block">
             Exit Vault
           </Link>
         </div>

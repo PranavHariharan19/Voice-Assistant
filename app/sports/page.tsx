@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-context";
 import { useRouter } from "next/navigation";
@@ -51,32 +52,39 @@ function SortableItem({ entity, onClick, isSelected }: { entity: FavoriteEntity;
     <div
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...listeners}
-      className={`group relative overflow-hidden rounded-2xl p-6 cursor-grab active:cursor-grabbing transition-all duration-300 ${
+      className={`group relative overflow-hidden rounded-2xl p-6 cursor-pointer active:scale-[0.98] transition-all duration-200 select-none ${
         isSelected
           ? "border-2 border-[#00A19B] bg-[#00A19B]/10 shadow-lg shadow-[#00A19B]/20 scale-[1.02]"
           : "bg-white/70 border border-white shadow-sm hover:-translate-y-1 hover:bg-white hover:shadow-xl hover:shadow-[#00A19B]/10"
-      } ${isDragging ? "shadow-2xl ring-2 ring-[#00A19B] opacity-80 z-50" : ""}`}
+      } ${isDragging ? "shadow-2xl ring-2 ring-[#00A19B] opacity-80 z-50 cursor-grabbing" : ""}`}
       onClick={onClick}
     >
-      <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-gradient-to-br from-[#00A19B]/20 to-transparent blur-2xl transition-transform duration-500 group-hover:scale-150"></div>
+      <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-gradient-to-br from-[#00A19B]/20 to-transparent blur-2xl transition-transform duration-500 group-hover:scale-150 pointer-events-none"></div>
 
       <div className="relative z-10 flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <span className="inline-flex items-center rounded-full bg-[#17211f]/5 px-2.5 py-0.5 text-xs font-semibold capitalize text-[#00A19B]">
             {entity.sport}
           </span>
-          <svg
-            className="w-5 h-5 text-[#17211f]/20 opacity-0 group-hover:opacity-100 transition-opacity"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={2}
-            stroke="currentColor"
+          <div
+            {...attributes}
+            {...listeners}
+            onClick={(e) => e.stopPropagation()}
+            className="p-1.5 -mr-1.5 rounded-lg text-[#17211f]/30 hover:text-[#17211f]/70 hover:bg-[#17211f]/5 transition-colors cursor-grab active:cursor-grabbing"
+            title="Drag to reorder"
+            aria-label="Drag to reorder"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 9h16.5m-16.5 6.75h16.5" />
-          </svg>
+            <svg
+              className="w-5 h-5 transition-opacity"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 9h16.5m-16.5 6.75h16.5" />
+            </svg>
+          </div>
         </div>
         <h3 className="text-xl font-bold tracking-tight text-[#17211f] line-clamp-2">
           {entity.entity_name}
@@ -89,8 +97,20 @@ function SortableItem({ entity, onClick, isSelected }: { entity: FavoriteEntity;
 export default function SportsPage() {
   const { user, loading: authLoading, initialized } = useAuth();
   const router = useRouter();
+
   const [entities, setEntities] = useState<FavoriteEntity[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem("cachedFavoriteEntities");
+      if (cached) {
+        setEntities(JSON.parse(cached));
+        setLoading(false);
+      }
+    } catch {}
+  }, []);
+
   const [filter, setFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedEntity, setSelectedEntity] = useState<FavoriteEntity | null>(null);
@@ -105,10 +125,22 @@ export default function SportsPage() {
   const [toast, setToast] = useState<{ success?: string; error?: string } | null>(null);
   const [isAdding, setIsAdding] = useState(false);
 
+  // In-memory + sessionStorage cache for instant match schedule display
+  const scheduleCacheRef = useRef<Record<string, ScheduleItem[]>>({});
+
+  useEffect(() => {
+    try {
+      const stored = sessionStorage.getItem("sportsScheduleCache");
+      if (stored) {
+        scheduleCacheRef.current = JSON.parse(stored);
+      }
+    } catch {}
+  }, []);
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 5, // Requires a 5px drag distance before activating to distinguish from clicks
+        distance: 8,
       },
     }),
     useSensor(KeyboardSensor, {
@@ -121,6 +153,11 @@ export default function SportsPage() {
       router.push("/");
     }
   }, [user, initialized, router]);
+
+  // Warm-up calendar route in background
+  useEffect(() => {
+    router.prefetch("/calendar");
+  }, [router]);
 
   useEffect(() => {
     if (!user) return;
@@ -170,8 +207,9 @@ export default function SportsPage() {
               });
             }
           }
+          localStorage.setItem("cachedFavoriteEntities", JSON.stringify(withIds));
         } catch(e) {
-          console.error("Error reading order from localStorage", e);
+          console.error("Error saving entities cache", e);
         }
 
         setEntities(withIds);
@@ -185,16 +223,54 @@ export default function SportsPage() {
     };
   }, [user]);
 
+  // Pre-fetch top entities in background for instant 0ms responses on click
+  useEffect(() => {
+    if (entities.length === 0) return;
+    const topEntities = entities.slice(0, 5);
+    const timeout = setTimeout(() => {
+      topEntities.forEach((ent) => {
+        if (!scheduleCacheRef.current[ent.id]) {
+          fetch(`/api/sports/schedule?entityId=${ent.id}`)
+            .then((res) => (res.ok ? res.json() : null))
+            .then((data) => {
+              if (data?.schedule) {
+                scheduleCacheRef.current[ent.id] = data.schedule;
+                try {
+                  sessionStorage.setItem("sportsScheduleCache", JSON.stringify(scheduleCacheRef.current));
+                } catch {}
+              }
+            })
+            .catch(() => {});
+        }
+      });
+    }, 150);
+    return () => clearTimeout(timeout);
+  }, [entities]);
+
+  // Instant selection handler
+  function handleSelectEntity(entity: FavoriteEntity) {
+    setSelectedEntity(entity);
+    const cached = scheduleCacheRef.current[entity.id];
+    if (cached && cached.length > 0) {
+      setScheduleData(cached);
+      setScheduleLoading(false);
+      setScheduleError(null);
+    } else {
+      setScheduleData([]);
+      setScheduleLoading(true);
+      setScheduleError(null);
+    }
+  }
+
   useEffect(() => {
     if (!selectedEntity) return;
 
     let isMounted = true;
-    setTimeout(() => {
-      if (isMounted) {
-        setScheduleLoading(true);
-        setScheduleError(null);
-      }
-    }, 0);
+    const cached = scheduleCacheRef.current[selectedEntity.id];
+    if (!cached || cached.length === 0) {
+      setScheduleLoading(true);
+      setScheduleError(null);
+    }
 
     async function loadSchedule() {
       try {
@@ -205,15 +281,23 @@ export default function SportsPage() {
         const data = await res.json();
         if (data.error) throw new Error(data.error);
 
+        const newSchedule = data.schedule || [];
+        scheduleCacheRef.current[selectedEntity!.id] = newSchedule;
+        try {
+          sessionStorage.setItem("sportsScheduleCache", JSON.stringify(scheduleCacheRef.current));
+        } catch {}
+
         if (isMounted) {
-          setScheduleData(data.schedule || []);
+          setScheduleData(newSchedule);
         }
       } catch (e: unknown) {
         if (isMounted) {
-          if (e instanceof Error) {
-            setScheduleError(e.message);
-          } else {
-            setScheduleError("An error occurred");
+          if (!cached || cached.length === 0) {
+            if (e instanceof Error) {
+              setScheduleError(e.message);
+            } else {
+              setScheduleError("An error occurred");
+            }
           }
         }
       } finally {
@@ -420,15 +504,16 @@ export default function SportsPage() {
       {/* Header */}
       <header className="sticky top-0 z-10 flex items-center justify-between bg-[#E4DDD3]/80 px-6 py-4 backdrop-blur-md border-b border-[#17211f]/5">
         <div className="flex items-center gap-4">
-          <button
-            onClick={() => router.push("/calendar")}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/50 text-[#17211f] shadow-sm transition-all hover:bg-white"
+          <Link
+            href="/calendar"
+            prefetch={true}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/50 text-[#17211f] shadow-sm transition-all hover:bg-white active:scale-95 cursor-pointer"
             aria-label="Go back"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
               <path fillRule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z" />
             </svg>
-          </button>
+          </Link>
           <h1 className="text-2xl font-bold tracking-tight">Favorite Teams</h1>
         </div>
       </header>
@@ -501,7 +586,7 @@ export default function SportsPage() {
                         key={entity.id} 
                         entity={entity} 
                         isSelected={selectedEntity?.id === entity.id}
-                        onClick={() => setSelectedEntity(entity)} 
+                        onClick={() => handleSelectEntity(entity)} 
                       />
                     ))}
                   </div>
