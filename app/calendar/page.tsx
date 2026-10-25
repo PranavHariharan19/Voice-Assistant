@@ -1895,9 +1895,9 @@ export default function Home() {
                 </div>
               </section>
             ) : (
-              <div className="flex flex-col flex-1 gap-5 overflow-hidden">
-                <section className="side-panel animate-rise delay-100 shrink-0">
-                  <div className="flex items-start justify-between gap-3">
+              <div className="flex flex-col flex-1 gap-5 overflow-y-auto xl:overflow-hidden pr-0.5 min-h-0">
+                <section className="side-panel animate-rise delay-100 flex flex-col shrink-0">
+                  <div className="flex items-start justify-between gap-3 shrink-0">
                     <div>
                       <p className="text-sm font-semibold text-[#00A19B]">
                         Selected date
@@ -1921,7 +1921,7 @@ export default function Home() {
                     </div>
                   </div>
 
-                  <div className="mt-5 space-y-3">
+                  <div className="mt-4 space-y-3 overflow-y-auto custom-scrollbar pr-1.5 max-h-[280px] overscroll-contain">
                     {selectedEvents.length > 0 ? (
                       selectedEvents.map((event) => (
                         <EventCard
@@ -1948,7 +1948,7 @@ export default function Home() {
                   </div>
                 </section>
 
-                <section className="side-panel today-panel animate-rise delay-200 flex flex-col overflow-hidden min-h-0">
+                <section className="side-panel today-panel animate-rise delay-200 flex flex-col shrink-0">
                   <div className="flex items-center justify-between gap-3 shrink-0">
                     <div>
                       <p className="text-sm font-semibold text-[#00A19B]">
@@ -1957,7 +1957,7 @@ export default function Home() {
                     </div>
                   </div>
 
-                  <div className="mt-5 space-y-3 overflow-y-auto">
+                  <div className="mt-4 space-y-3 overflow-y-auto custom-scrollbar pr-1.5 max-h-[220px] overscroll-contain">
                     {todayEvents.length > 0 ? (
                       todayEvents.map((event) => (
                         <EventCard
