@@ -2,6 +2,50 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
+function formatEspnSoccerMatch(match: any) {
+  const d = new Date(match.date);
+  const competition = match.competitions?.[0];
+
+  const venueName = competition?.venue?.fullName;
+  const venueCity = competition?.venue?.address?.city;
+  const venue = venueName
+    ? (venueCity && !venueName.toLowerCase().includes(venueCity.toLowerCase())
+        ? `${venueName}, ${venueCity}`
+        : venueName)
+    : (venueCity || "TBA");
+
+  let title = match.name;
+  if (competition?.competitors && competition.competitors.length >= 2) {
+    const homeComp = competition.competitors.find((c: any) => c.homeAway === "home");
+    const awayComp = competition.competitors.find((c: any) => c.homeAway === "away");
+    if (homeComp && awayComp) {
+      const leagueName = match.league?.name || "";
+      title = `${homeComp.team?.displayName || "TBA"} vs ${awayComp.team?.displayName || "TBA"}${
+        leagueName ? ` (${leagueName})` : ""
+      }`;
+    }
+  }
+
+  return {
+    id: String(match.id),
+    title: title,
+    date: new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Kolkata",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric"
+    }).format(d),
+    time: new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Kolkata",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false
+    }).format(d),
+    venue: venue,
+    timestamp: d.getTime()
+  };
+}
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const entityId = searchParams.get("entityId");
@@ -38,161 +82,177 @@ export async function GET(request: NextRequest) {
   try {
     let schedule: any[] = [];
 
-    if (entityName.toLowerCase().includes('ronaldo')) {
-      // Pull Portugal matches from the World Cup 2026 repository
-      const [matchesRes, teamsRes, stadiumsRes] = await Promise.all([
-          fetch('https://raw.githubusercontent.com/rezarahiminia/worldcup2026/main/football.matches.json'),
-          fetch('https://raw.githubusercontent.com/rezarahiminia/worldcup2026/main/football.teams.json'),
-          fetch('https://raw.githubusercontent.com/rezarahiminia/worldcup2026/main/football.stadiums.json')
-      ]);
+    const isFootball =
+      teamData.sport?.toLowerCase() === "football" ||
+      provider === "api-football" ||
+      provider === "thesportsdb" ||
+      provider === "sofascore" ||
+      entityName.toLowerCase().includes("ronaldo");
 
-      if (matchesRes.ok && teamsRes.ok && stadiumsRes.ok) {
-          const matches = await matchesRes.json();
-          const teams = await teamsRes.json();
-          const stadiums = await stadiumsRes.json();
+    if (isFootball) {
+      const lowerName = entityName.toLowerCase().trim();
+      const lowerExtId = (external_id || "").toLowerCase().trim();
 
-          const teamMap = new Map(teams.map((t: any) => [t.id, t.name_en]));
-          const stadiumMap = new Map(stadiums.map((s: any) => [s.id, s.name_en]));
-
-          const portugalMatches = matches.filter((m: any) => {
-              const home = teamMap.get(m.home_team_id) || '';
-              const away = teamMap.get(m.away_team_id) || '';
-              return home === 'Portugal' || away === 'Portugal';
+      // Check if it is a FIFA World Cup / tournament entity
+      if (lowerExtId === "fifa" || lowerName.includes("fifa") || lowerName.includes("world cup")) {
+        try {
+          const res = await fetch("https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=2026", {
+            next: { revalidate: 21600 }
           });
-
-          const allFixtures = portugalMatches.map((m: any) => {
-              const homeTeam = teamMap.get(m.home_team_id) || 'TBA';
-              const awayTeam = teamMap.get(m.away_team_id) || 'TBA';
-              const stadium = stadiumMap.get(m.stadium_id) || 'TBA';
-              
-              const [datePart, timePart] = m.local_date.split(' ');
-              const [month, day, year] = datePart.split('/');
-              const dateObj = new Date(`${year}-${month}-${day}T${timePart}:00Z`);
-
-              return {
-                  id: m.id,
-                  name: `${homeTeam} vs ${awayTeam}`,
-                  date: dateObj.toISOString(),
-                  venue: stadium
-              };
-          });
-
-          const now = new Date();
-          const upcoming = allFixtures.filter((e: any) => new Date(e.date) > now);
-
-          if (upcoming.length > 0) {
-             schedule = upcoming.map((match: any) => {
-                const d = new Date(match.date);
-                return {
-                   id: match.id,
-                   title: match.name,
-                   date: new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric' }).format(d),
-                   time: new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false }).format(d),
-                   venue: match.venue || 'TBA'
-                };
-             });
-          } else {
-             console.error('World Cup 2026: No upcoming fixtures found for Portugal (Ronaldo)');
+          if (res.ok) {
+            const data = await res.json();
+            const events = data.events || [];
+            const now = Date.now() - 4 * 3600 * 1000;
+            schedule = events
+              .map(formatEspnSoccerMatch)
+              .filter((m: any) => m.timestamp >= now)
+              .sort((a: any, b: any) => a.timestamp - b.timestamp);
           }
+        } catch (err) {
+          console.error("Error fetching FIFA schedule:", err);
+        }
       } else {
-          console.error('World Cup 2026 fetch failed for Ronaldo');
-      }
-    } else if (provider === 'api-football' || provider === 'thesportsdb' || provider === 'sofascore') {
-      let allFixtures: any[] = [];
-      try {
-        const leagues = ['eng.1', 'esp.1', 'ita.1', 'ger.1', 'fra.1', 'uefa.champions', 'uefa.europa', 'fifa.world'];
-        let teamId = null;
-        let foundLeague = null;
+        // Known team IDs map for fast and precise resolution
+        const KNOWN_TEAM_IDS: Record<string, string[]> = {
+          "cristiano ronaldo": ["817", "482"], // Al Nassr + Portugal
+          "ronaldo": ["817", "482"],
+          "cristiano-ronaldo": ["817", "482"],
+          "real madrid": ["86"],
+          "real-madrid": ["86"],
+          "chennaiyin fc": ["18000"],
+          "chennaiyin-fc": ["18000"],
+          "chennaiyin": ["18000"],
+          "al nassr": ["817"],
+          "al-nassr": ["817"],
+          "portugal": ["482"],
+          "barcelona": ["83"],
+          "fc barcelona": ["83"],
+          "manchester united": ["360"],
+          "arsenal": ["359"],
+          "liverpool": ["364"],
+          "manchester city": ["382"],
+          "chelsea": ["363"],
+          "bayern munich": ["132"],
+          "paris saint-germain": ["160"],
+          "psg": ["160"],
+          "juventus": ["111"],
+          "inter milan": ["110"],
+          "ac milan": ["103"],
+          "atletico madrid": ["1068"],
+          "kerala blasters fc": ["18005"],
+          "kerala blasters": ["18005"],
+          "mohun bagan super giant": ["18006"],
+          "mohun bagan": ["18006"],
+          "mumbai city fc": ["18007"],
+          "mumbai city": ["18007"],
+          "bengaluru fc": ["18002"],
+          "bengaluru": ["18002"]
+        };
 
-        // Use World Cup 2026 Github repo for FIFA
-        if (external_id === 'fifa' || entityName.toLowerCase().includes('fifa') || entityName.toLowerCase().includes('world cup')) {
-           const [matchesRes, teamsRes, stadiumsRes] = await Promise.all([
-               fetch('https://raw.githubusercontent.com/rezarahiminia/worldcup2026/main/football.matches.json'),
-               fetch('https://raw.githubusercontent.com/rezarahiminia/worldcup2026/main/football.teams.json'),
-               fetch('https://raw.githubusercontent.com/rezarahiminia/worldcup2026/main/football.stadiums.json')
-           ]);
+        let teamIds: string[] = KNOWN_TEAM_IDS[lowerName] || KNOWN_TEAM_IDS[lowerExtId] || [];
 
-           if (matchesRes.ok && teamsRes.ok && stadiumsRes.ok) {
-               const matches = await matchesRes.json();
-               const teams = await teamsRes.json();
-               const stadiums = await stadiumsRes.json();
+        // If not in known dictionary, dynamically search across popular leagues
+        if (teamIds.length === 0) {
+          const leagues = [
+            "eng.1", "esp.1", "ita.1", "ger.1", "fra.1",
+            "ind.1", "ksa.1", "uefa.champions", "uefa.europa",
+            "uefa.nations", "fifa.world"
+          ];
 
-               const teamMap = new Map(teams.map((t: any) => [t.id, t.name_en]));
-               const stadiumMap = new Map(stadiums.map((s: any) => [s.id, s.name_en]));
+          try {
+            const leagueResponses = await Promise.all(
+              leagues.map(l =>
+                fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${l}/teams`, {
+                  next: { revalidate: 86400 }
+                }).then(r => (r.ok ? r.json() : null)).catch(() => null)
+              )
+            );
 
-               allFixtures = matches.map((m: any) => {
-                   const homeTeam = teamMap.get(m.home_team_id) || 'TBA';
-                   const awayTeam = teamMap.get(m.away_team_id) || 'TBA';
-                   const stadium = stadiumMap.get(m.stadium_id) || 'TBA';
-                   
-                   // local_date is MM/DD/YYYY HH:MM
-                   const [datePart, timePart] = m.local_date.split(' ');
-                   const [month, day, year] = datePart.split('/');
-                   const dateObj = new Date(`${year}-${month}-${day}T${timePart}:00Z`); // Treat as UTC for sorting
-
-                   return {
-                       id: m.id,
-                       name: `${homeTeam} vs ${awayTeam}`,
-                       date: dateObj.toISOString(),
-                       venue: stadium
-                   };
-               });
-
-               const now = new Date();
-               const upcoming = allFixtures.filter((e: any) => new Date(e.date) > now);
-               allFixtures = upcoming.length > 0 ? upcoming : allFixtures;
-           }
-        } else {
-          // Use ESPN for standard teams
-          for (const l of leagues) {
-             const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${l}/teams`);
-             if(res.ok) {
-                const data = await res.json();
-                if (data.sports && data.sports[0] && data.sports[0].leagues && data.sports[0].leagues[0]) {
-                   const team = data.sports[0].leagues[0].teams.find((t: any) => 
-                       t.team.name.toLowerCase() === entityName.toLowerCase() || 
-                       t.team.displayName.toLowerCase() === entityName.toLowerCase() ||
-                       t.team.shortDisplayName.toLowerCase() === entityName.toLowerCase()
-                   );
-                   if(team) { 
-                      teamId = team.team.id; 
-                      foundLeague = l;
-                      break; 
-                   }
+            for (const data of leagueResponses) {
+              if (data?.sports?.[0]?.leagues?.[0]?.teams) {
+                const teams = data.sports[0].leagues[0].teams;
+                const found = teams.find((t: any) => {
+                  const tName = (t.team?.name || "").toLowerCase();
+                  const tDisplay = (t.team?.displayName || "").toLowerCase();
+                  const tShort = (t.team?.shortDisplayName || "").toLowerCase();
+                  return (
+                    tName === lowerName ||
+                    tDisplay === lowerName ||
+                    tShort === lowerName ||
+                    lowerName.includes(tName) ||
+                    tDisplay.includes(lowerName)
+                  );
+                });
+                if (found?.team?.id) {
+                  teamIds = [String(found.team.id)];
+                  break;
                 }
-             }
-          }
-
-          if (teamId && foundLeague) {
-             const scheduleRes = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${foundLeague}/teams/${teamId}/schedule`);
-             if (scheduleRes.ok) {
-                 const scheduleData = await scheduleRes.json();
-                 const events = scheduleData.events || [];
-                 
-                 const now = new Date();
-                 const upcoming = events.filter((e: any) => new Date(e.date) > now);
-
-                 allFixtures = upcoming.length > 0 ? upcoming : events.slice(-5);
-             }
+              }
+            }
+          } catch (err) {
+            console.error("Error searching leagues for team:", err);
           }
         }
-      } catch (err) {
-        console.error('ESPN fetch error:', err);
-      }
 
-      if (allFixtures.length > 0) {
-        schedule = allFixtures.map((match: any) => {
-          const d = new Date(match.date);
-          return {
-            id: match.id,
-            title: match.name,
-            date: new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric' }).format(d),
-            time: new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false }).format(d),
-            venue: match.venue || 'TBA'
-          };
-        });
-      } else {
-        console.error('ESPN: No upcoming fixtures found for', entityName);
+        if (teamIds.length > 0) {
+          try {
+            // 1. Fetch upcoming fixtures across all competitions (?fixture=true)
+            const scheduleResponses = await Promise.all(
+              teamIds.map(id =>
+                fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/all/teams/${id}/schedule?fixture=true`, {
+                  next: { revalidate: 3600 }
+                }).then(r => (r.ok ? r.json() : null)).catch(() => null)
+              )
+            );
+
+            const allEvents: any[] = [];
+            for (const schedData of scheduleResponses) {
+              if (schedData?.events) {
+                allEvents.push(...schedData.events);
+              }
+            }
+
+            // 2. Fetch standard schedule in case today's match is currently ongoing or today
+            const liveResponses = await Promise.all(
+              teamIds.map(id =>
+                fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/all/teams/${id}/schedule`, {
+                  next: { revalidate: 1800 }
+                }).then(r => (r.ok ? r.json() : null)).catch(() => null)
+              )
+            );
+            for (const lData of liveResponses) {
+              if (lData?.events) {
+                for (const ev of lData.events) {
+                  if (!allEvents.some(existing => existing.id === ev.id)) {
+                    allEvents.push(ev);
+                  }
+                }
+              }
+            }
+
+            const now = Date.now() - 4 * 3600 * 1000; // include matches started within last 4 hours
+            const formatted = allEvents
+              .map(formatEspnSoccerMatch)
+              .filter((m: any) => m.timestamp >= now);
+
+            // Deduplicate by match id
+            const seenIds = new Set<string>();
+            const uniqueMatches: any[] = [];
+            for (const m of formatted) {
+              if (!seenIds.has(m.id)) {
+                seenIds.add(m.id);
+                uniqueMatches.push(m);
+              }
+            }
+
+            uniqueMatches.sort((a, b) => a.timestamp - b.timestamp);
+            schedule = uniqueMatches;
+          } catch (err) {
+            console.error("Error fetching soccer schedule:", err);
+          }
+        } else {
+          console.error("Could not find team ID for football entity:", entityName);
+        }
       }
     } else if (provider === 'cricbuzz' || provider === 'cricketdata') {
       const rapidApiKey = process.env.RAPIDAPI_KEY || '';
