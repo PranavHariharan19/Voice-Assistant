@@ -318,6 +318,8 @@ export default function Home() {
   const [filterToDate, setFilterToDate] = useState("");
   const [popupState, setPopupState] = useState<PopupState>(null);
   const [copiedEventId, setCopiedEventId] = useState<number | string | null>(null);
+  const [sidePanelTab, setSidePanelTab] = useState<"selected" | "today">("selected");
+  const [splitView, setSplitView] = useState(false);
 
   useEffect(() => {
     if (!popupState) return;
@@ -1019,6 +1021,7 @@ export default function Home() {
     setIsDetailOpen(false);
     setIsMonthSelectorOpen(false);
     setIsYearSelectorOpen(false);
+    setSidePanelTab("selected");
     setFormValues((current) => ({
       ...current,
       date: displayDate(dateKey(date)),
@@ -1602,7 +1605,7 @@ export default function Home() {
             </div>
           </section>
 
-          <aside className="flex flex-col gap-5 w-full xl:w-[480px] shrink-0 h-auto xl:h-[calc(100vh-80px)]">
+          <aside className="flex flex-col gap-3.5 xl:gap-4 w-full xl:w-[480px] shrink-0 h-auto xl:h-[calc(100vh-80px)]">
             {isRoutineOpen ? (
               <section className="side-panel flex flex-col h-full animate-rise">
                 <div className="flex items-center justify-between border-b border-[#17211f]/10 pb-4 mb-4 shrink-0">
@@ -1895,24 +1898,65 @@ export default function Home() {
                 </div>
               </section>
             ) : (
-              <div className="flex flex-col flex-1 gap-5 overflow-y-auto xl:overflow-hidden pr-0.5 min-h-0">
-                <section className="side-panel animate-rise delay-100 flex flex-col shrink-0">
-                  <div className="flex items-start justify-between gap-3 shrink-0">
+              <div className="flex flex-col flex-1 gap-3.5 xl:gap-4 overflow-y-auto pr-0.5 min-h-0">
+                {/* Main Events Schedule Panel */}
+                <section className="side-panel animate-rise delay-100 flex flex-col flex-1 min-h-0">
+                  {/* Header */}
+                  <div className="flex items-start justify-between gap-3 shrink-0 pb-3 border-b border-[#17211f]/10">
                     <div>
-                      <p className="text-sm font-semibold text-[#00A19B]">
-                        Selected date
-                      </p>
-                      <h2 className="mt-1 text-2xl font-semibold">
-                        {selectedDate.toLocaleDateString("en-GB")}
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs font-bold uppercase tracking-wider text-[#00A19B]">
+                          {sameDay(selectedDate, today)
+                            ? "Today's Schedule"
+                            : splitView
+                            ? "Events Schedule"
+                            : sidePanelTab === "selected"
+                            ? "Selected Date"
+                            : "Today's Schedule"}
+                        </p>
+                        {sameDay(selectedDate, today) && (
+                          <span className="flex h-2 w-2 rounded-full bg-[#00A19B] animate-pulse" />
+                        )}
+                      </div>
+                      <h2 className="mt-1 text-2xl font-bold tracking-tight text-[#17211f]">
+                        {sameDay(selectedDate, today)
+                          ? selectedDate.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" })
+                          : splitView
+                          ? `${selectedDate.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} & Today`
+                          : sidePanelTab === "selected"
+                          ? selectedDate.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" })
+                          : today.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
                       </h2>
                     </div>
-                    <div className="flex flex-col items-end gap-2">
-                      <span className="rounded-full bg-[#17211f] px-3 py-1 text-xs font-bold text-[#E4DDD3]">
-                        {selectedEvents.length} event
-                        {selectedEvents.length === 1 ? "" : "s"}
-                      </span>
+
+                    <div className="flex flex-col items-end gap-1.5 shrink-0">
+                      <div className="flex items-center gap-1.5">
+                        {sameDay(selectedDate, today) && (
+                          <span className="rounded-full bg-[#00A19B]/15 border border-[#00A19B]/25 px-2.5 py-0.5 text-xs font-bold text-[#00A19B]">
+                            Today
+                          </span>
+                        )}
+                        <span className="rounded-full bg-[#17211f] px-2.5 py-0.5 text-xs font-bold text-[#E4DDD3]">
+                          {sameDay(selectedDate, today)
+                            ? todayEvents.length
+                            : splitView
+                            ? selectedEvents.length + todayEvents.length
+                            : sidePanelTab === "selected"
+                            ? selectedEvents.length
+                            : todayEvents.length}{" "}
+                          {(sameDay(selectedDate, today)
+                            ? todayEvents.length
+                            : splitView
+                            ? selectedEvents.length + todayEvents.length
+                            : sidePanelTab === "selected"
+                            ? selectedEvents.length
+                            : todayEvents.length) === 1
+                            ? "event"
+                            : "events"}
+                        </span>
+                      </div>
                       <button
-                        className="rounded-full border border-[#D56B68]/30 bg-[#D56B68]/10 px-3 py-1.5 text-xs font-bold text-[#D56B68] transition-all hover:bg-[#D56B68] hover:text-white cursor-pointer"
+                        className="rounded-full border border-[#D56B68]/30 bg-[#D56B68]/10 px-3 py-1 text-xs font-bold text-[#D56B68] transition-all hover:bg-[#D56B68] hover:text-white cursor-pointer"
                         type="button"
                         onClick={() => signOut()}
                       >
@@ -1921,72 +1965,351 @@ export default function Home() {
                     </div>
                   </div>
 
-                  <div className="mt-4 space-y-3 overflow-y-auto custom-scrollbar pr-1.5 max-h-[280px] overscroll-contain">
-                    {selectedEvents.length > 0 ? (
-                      selectedEvents.map((event) => (
-                        <EventCard
-                          event={event}
-                          isSelected={event.id === selectedEventId}
-                          key={event.id}
-                          onSelect={() => selectEvent(event)}
-                          showTickButton={true}
-                          onToggleStatus={() => {
-                            const nextStatus = event.status === "completed" ? "pending" : "completed";
-                            updateEventStatus(event.id, event.date, nextStatus);
+                  {/* Date Tabs (Only shown when selected date is NOT today) */}
+                  {!sameDay(selectedDate, today) && (
+                    <div className="flex items-center justify-between gap-2 pt-2.5 shrink-0">
+                      <div className="flex items-center p-1 bg-white/60 rounded-xl border border-[#17211f]/10 flex-1 shadow-xs">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSidePanelTab("selected");
+                            setSplitView(false);
                           }}
-                          onToggleMissed={() => {
-                            const nextStatus = event.status === "missed" ? "pending" : "missed";
-                            updateEventStatus(event.id, event.date, nextStatus);
-                          }}
-                        />
-                      ))
-                    ) : (
-                      <div className="empty-state">
-                        <p className="text-sm font-semibold">No Events Scheduled</p>
-                      </div>
-                    )}
-                  </div>
-                </section>
+                          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            !splitView && sidePanelTab === "selected"
+                              ? "bg-[#00A19B] text-white shadow-sm"
+                              : "text-[#17211f]/70 hover:text-[#17211f]"
+                          }`}
+                        >
+                          <span className="truncate">{selectedDate.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</span>
+                          <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold shrink-0 ${
+                            !splitView && sidePanelTab === "selected" ? "bg-white/20 text-white" : "bg-[#17211f]/10 text-[#17211f]"
+                          }`}>
+                            {selectedEvents.length}
+                          </span>
+                        </button>
 
-                <section className="side-panel today-panel animate-rise delay-200 flex flex-col shrink-0">
-                  <div className="flex items-center justify-between gap-3 shrink-0">
-                    <div>
-                      <p className="text-sm font-semibold text-[#00A19B]">
-                        Today&apos;s events
-                      </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSidePanelTab("today");
+                            setSplitView(false);
+                          }}
+                          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            !splitView && sidePanelTab === "today"
+                              ? "bg-[#00A19B] text-white shadow-sm"
+                              : "text-[#17211f]/70 hover:text-[#17211f]"
+                          }`}
+                        >
+                          <span>Today</span>
+                          <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold shrink-0 ${
+                            !splitView && sidePanelTab === "today" ? "bg-white/20 text-white" : "bg-[#17211f]/10 text-[#17211f]"
+                          }`}>
+                            {todayEvents.length}
+                          </span>
+                        </button>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setSplitView(!splitView)}
+                        className={`p-2 rounded-xl border text-xs font-semibold transition-all cursor-pointer shrink-0 ${
+                          splitView
+                            ? "bg-[#00A19B] border-[#00A19B] text-white shadow-sm"
+                            : "bg-white/60 border-[#17211f]/10 text-[#17211f]/70 hover:bg-white hover:text-[#17211f]"
+                        }`}
+                        title={splitView ? "Switch to Tab View" : "Split View (Show Both Dates)"}
+                        aria-label={splitView ? "Switch to Tab View" : "Split View (Show Both Dates)"}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                          <path d="M0 3a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3zm1 2v6h14V5H1zm14-1V3a1 1 0 0 0-1-1H2a1 1 0 0 0-1 1v1h14zM1 12v1a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-1H1z"/>
+                        </svg>
+                      </button>
                     </div>
-                  </div>
+                  )}
 
-                  <div className="mt-4 space-y-3 overflow-y-auto custom-scrollbar pr-1.5 max-h-[220px] overscroll-contain">
-                    {todayEvents.length > 0 ? (
-                      todayEvents.map((event) => (
-                        <EventCard
-                          event={event}
-                          isSelected={event.id === selectedEventId}
-                          key={event.id}
-                          onSelect={() => selectEvent(event)}
-                          showTickButton={true}
-                          onToggleStatus={() => {
-                            const nextStatus = event.status === "completed" ? "pending" : "completed";
-                            updateEventStatus(event.id, event.date, nextStatus);
-                          }}
-                          onToggleMissed={() => {
-                            const nextStatus = event.status === "missed" ? "pending" : "missed";
-                            updateEventStatus(event.id, event.date, nextStatus);
-                          }}
-                        />
-                      ))
-                    ) : (
-                      <div className="empty-state">
-                        <p className="text-sm font-semibold">No Events Scheduled</p>
+                  {/* Events List Body */}
+                  {sameDay(selectedDate, today) ? (
+                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-1.5 pt-3 min-h-0 overscroll-contain">
+                      {todayEvents.length > 0 ? (
+                        <div className="space-y-2.5 pb-2">
+                          {todayEvents.map((event) => (
+                            <EventCard
+                              event={event}
+                              isSelected={event.id === selectedEventId}
+                              key={event.id}
+                              onSelect={() => selectEvent(event)}
+                              showTickButton={true}
+                              onToggleStatus={() => {
+                                const nextStatus = event.status === "completed" ? "pending" : "completed";
+                                updateEventStatus(event.id, event.date, nextStatus);
+                              }}
+                              onToggleMissed={() => {
+                                const nextStatus = event.status === "missed" ? "pending" : "missed";
+                                updateEventStatus(event.id, event.date, nextStatus);
+                              }}
+                            />
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              selectDate(today);
+                              setFormValues(createEmptyForm(displayDate(dateKey(today))));
+                              setIsDetailOpen(false);
+                              setIsRoutineOpen(false);
+                              setIsChatOpen(false);
+                              setFormMode("add");
+                            }}
+                            className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-dashed border-[#17211f]/15 hover:border-[#00A19B]/40 bg-white/20 hover:bg-white/50 text-xs font-semibold text-[#17211f]/60 hover:text-[#00A19B] transition-all cursor-pointer"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
+                              <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
+                            </svg>
+                            <span>Add another event</span>
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center py-7 px-4 text-center rounded-2xl border border-dashed border-[#17211f]/15 bg-white/30 my-auto">
+                          <div className="h-10 w-10 rounded-full bg-[#00A19B]/10 flex items-center justify-center text-[#00A19B] mb-2.5">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+                              <path d="M11 6.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1z"/>
+                              <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5zM1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4H1z"/>
+                            </svg>
+                          </div>
+                          <p className="text-sm font-bold text-[#17211f]">No Events Scheduled</p>
+                          <p className="text-xs text-[#17211f]/60 max-w-[220px] mt-0.5 mb-3">
+                            Your schedule is clear for today.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              selectDate(today);
+                              setFormValues(createEmptyForm(displayDate(dateKey(today))));
+                              setIsDetailOpen(false);
+                              setIsRoutineOpen(false);
+                              setIsChatOpen(false);
+                              setFormMode("add");
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-full bg-[#00A19B] px-3.5 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-[#008984] hover:shadow transition-all active:scale-95 cursor-pointer"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
+                              <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
+                            </svg>
+                            <span>Add Event</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ) : splitView ? (
+                    <div className="flex-1 flex flex-col gap-3 pt-2.5 min-h-0 overflow-hidden">
+                      <div className="flex flex-col flex-1 min-h-0">
+                        <div className="flex items-center justify-between pb-1 shrink-0">
+                          <p className="text-[11px] font-bold text-[#00A19B] uppercase tracking-wider">
+                            {selectedDate.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} ({selectedEvents.length})
+                          </p>
+                        </div>
+                        <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 min-h-0 space-y-2 pb-1">
+                          {selectedEvents.length > 0 ? (
+                            selectedEvents.map((event) => (
+                              <EventCard
+                                event={event}
+                                isSelected={event.id === selectedEventId}
+                                key={event.id}
+                                onSelect={() => selectEvent(event)}
+                                showTickButton={true}
+                                onToggleStatus={() => {
+                                  const nextStatus = event.status === "completed" ? "pending" : "completed";
+                                  updateEventStatus(event.id, event.date, nextStatus);
+                                }}
+                                onToggleMissed={() => {
+                                  const nextStatus = event.status === "missed" ? "pending" : "missed";
+                                  updateEventStatus(event.id, event.date, nextStatus);
+                                }}
+                              />
+                            ))
+                          ) : (
+                            <p className="text-xs text-[#17211f]/50 py-3 text-center">No events for this date</p>
+                          )}
+                        </div>
                       </div>
-                    )}
-                  </div>
+                      <div className="flex flex-col flex-1 min-h-0 border-t border-[#17211f]/10 pt-2">
+                        <div className="flex items-center justify-between pb-1 shrink-0">
+                          <p className="text-[11px] font-bold text-[#17211f]/70 uppercase tracking-wider">
+                            Today ({todayEvents.length})
+                          </p>
+                        </div>
+                        <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 min-h-0 space-y-2 pb-1">
+                          {todayEvents.length > 0 ? (
+                            todayEvents.map((event) => (
+                              <EventCard
+                                event={event}
+                                isSelected={event.id === selectedEventId}
+                                key={event.id}
+                                onSelect={() => selectEvent(event)}
+                                showTickButton={true}
+                                onToggleStatus={() => {
+                                  const nextStatus = event.status === "completed" ? "pending" : "completed";
+                                  updateEventStatus(event.id, event.date, nextStatus);
+                                }}
+                                onToggleMissed={() => {
+                                  const nextStatus = event.status === "missed" ? "pending" : "missed";
+                                  updateEventStatus(event.id, event.date, nextStatus);
+                                }}
+                              />
+                            ))
+                          ) : (
+                            <p className="text-xs text-[#17211f]/50 py-3 text-center">No events for today</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-1.5 pt-3 min-h-0 overscroll-contain">
+                      {sidePanelTab === "selected" ? (
+                        selectedEvents.length > 0 ? (
+                          <div className="space-y-2.5 pb-2">
+                            {selectedEvents.map((event) => (
+                              <EventCard
+                                event={event}
+                                isSelected={event.id === selectedEventId}
+                                key={event.id}
+                                onSelect={() => selectEvent(event)}
+                                showTickButton={true}
+                                onToggleStatus={() => {
+                                  const nextStatus = event.status === "completed" ? "pending" : "completed";
+                                  updateEventStatus(event.id, event.date, nextStatus);
+                                }}
+                                onToggleMissed={() => {
+                                  const nextStatus = event.status === "missed" ? "pending" : "missed";
+                                  updateEventStatus(event.id, event.date, nextStatus);
+                                }}
+                              />
+                            ))}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                selectDate(selectedDate);
+                                setFormValues(createEmptyForm(displayDate(dateKey(selectedDate))));
+                                setIsDetailOpen(false);
+                                setIsRoutineOpen(false);
+                                setIsChatOpen(false);
+                                setFormMode("add");
+                              }}
+                              className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-dashed border-[#17211f]/15 hover:border-[#00A19B]/40 bg-white/20 hover:bg-white/50 text-xs font-semibold text-[#17211f]/60 hover:text-[#00A19B] transition-all cursor-pointer"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
+                              </svg>
+                              <span>Add another event</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center py-7 px-4 text-center rounded-2xl border border-dashed border-[#17211f]/15 bg-white/30 my-auto">
+                            <div className="h-10 w-10 rounded-full bg-[#00A19B]/10 flex items-center justify-center text-[#00A19B] mb-2.5">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M11 6.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1z"/>
+                                <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5zM1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4H1z"/>
+                              </svg>
+                            </div>
+                            <p className="text-sm font-bold text-[#17211f]">No Events Scheduled</p>
+                            <p className="text-xs text-[#17211f]/60 max-w-[220px] mt-0.5 mb-3">
+                              No events scheduled for {selectedDate.toLocaleDateString("en-GB")}.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                selectDate(selectedDate);
+                                setFormValues(createEmptyForm(displayDate(dateKey(selectedDate))));
+                                setIsDetailOpen(false);
+                                setIsRoutineOpen(false);
+                                setIsChatOpen(false);
+                                setFormMode("add");
+                              }}
+                              className="inline-flex items-center gap-1.5 rounded-full bg-[#00A19B] px-3.5 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-[#008984] hover:shadow transition-all active:scale-95 cursor-pointer"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
+                              </svg>
+                              <span>Add Event</span>
+                            </button>
+                          </div>
+                        )
+                      ) : todayEvents.length > 0 ? (
+                        <div className="space-y-2.5 pb-2">
+                          {todayEvents.map((event) => (
+                            <EventCard
+                              event={event}
+                              isSelected={event.id === selectedEventId}
+                              key={event.id}
+                              onSelect={() => selectEvent(event)}
+                              showTickButton={true}
+                              onToggleStatus={() => {
+                                const nextStatus = event.status === "completed" ? "pending" : "completed";
+                                updateEventStatus(event.id, event.date, nextStatus);
+                              }}
+                              onToggleMissed={() => {
+                                const nextStatus = event.status === "missed" ? "pending" : "missed";
+                                updateEventStatus(event.id, event.date, nextStatus);
+                              }}
+                            />
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              selectDate(today);
+                              setFormValues(createEmptyForm(displayDate(dateKey(today))));
+                              setIsDetailOpen(false);
+                              setIsRoutineOpen(false);
+                              setIsChatOpen(false);
+                              setFormMode("add");
+                            }}
+                            className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-dashed border-[#17211f]/15 hover:border-[#00A19B]/40 bg-white/20 hover:bg-white/50 text-xs font-semibold text-[#17211f]/60 hover:text-[#00A19B] transition-all cursor-pointer"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
+                              <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
+                            </svg>
+                            <span>Add another event</span>
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center py-7 px-4 text-center rounded-2xl border border-dashed border-[#17211f]/15 bg-white/30 my-auto">
+                          <div className="h-10 w-10 rounded-full bg-[#00A19B]/10 flex items-center justify-center text-[#00A19B] mb-2.5">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+                              <path d="M11 6.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1z"/>
+                              <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5zM1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4H1z"/>
+                            </svg>
+                          </div>
+                          <p className="text-sm font-bold text-[#17211f]">No Events Scheduled</p>
+                          <p className="text-xs text-[#17211f]/60 max-w-[220px] mt-0.5 mb-3">
+                            Your schedule is clear for today.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              selectDate(today);
+                              setFormValues(createEmptyForm(displayDate(dateKey(today))));
+                              setIsDetailOpen(false);
+                              setIsRoutineOpen(false);
+                              setIsChatOpen(false);
+                              setFormMode("add");
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-full bg-[#00A19B] px-3.5 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-[#008984] hover:shadow transition-all active:scale-95 cursor-pointer"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
+                              <path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/>
+                            </svg>
+                            <span>Add Event</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </section>
 
-                <section className="side-panel animate-rise delay-200 shrink-0">
-                  <div className="flex items-center justify-between border-b border-[#17211f]/10 pb-3 mb-3">
-                    <p className="text-sm font-semibold text-[#00A19B]">Features</p>
+                {/* Features Dock */}
+                <section className="side-panel animate-rise delay-200 shrink-0 py-3.5 px-4">
+                  <div className="flex items-center justify-between border-b border-[#17211f]/10 pb-2 mb-2.5">
+                    <p className="text-xs font-bold uppercase tracking-wider text-[#00A19B]">Features</p>
                   </div>
                   <div className="grid grid-cols-3 gap-2">
                     <button
@@ -2040,7 +2363,8 @@ export default function Home() {
                   </div>
                 </section>
 
-                <section className="side-panel shrink-0 animate-rise delay-200 mt-auto">
+                {/* Voice Assistant Dock */}
+                <section className="side-panel shrink-0 animate-rise delay-200 py-2.5 px-3.5">
                   {ChatInputComponent}
                 </section>
               </div>
