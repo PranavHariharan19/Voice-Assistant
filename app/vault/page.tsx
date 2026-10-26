@@ -111,13 +111,20 @@ export default function VaultPage() {
           </p>
         </header>
 
-        <form onSubmit={onSubmit} className="space-y-4">
+        <form onSubmit={onSubmit} className="space-y-4" autoComplete="off">
           <div className="space-y-1">
             <label className="text-xs font-bold text-[#17211F]/60 uppercase ml-1">Master Password</label>
             <input
               required
               autoFocus
-              autoComplete="current-password"
+              autoComplete="new-password"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              data-lpignore="true"
+              data-1p-ignore="true"
+              data-form-type="other"
+              aria-autocomplete="none"
               name="password"
               type="password"
               placeholder="••••••••"

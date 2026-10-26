@@ -534,10 +534,10 @@ export default function VaultDashboard() {
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl p-8 w-full max-w-lg shadow-2xl">
             <h2 className="text-2xl font-bold text-[#17211F] mb-6">Create New Locker</h2>
-            <form onSubmit={handleCreateSubmit} className="space-y-4">
+            <form onSubmit={handleCreateSubmit} className="space-y-4" autoComplete="off">
               <div>
                 <label className="text-xs font-bold text-[#17211F]/60 uppercase ml-1">Title</label>
-                <input required name="title" className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#00A19B]/50" />
+                <input required name="title" autoComplete="off" className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#00A19B]/50" />
               </div>
               <div>
                 <label className="text-xs font-bold text-[#17211F]/60 uppercase ml-1">Content to Encrypt</label>
@@ -546,7 +546,20 @@ export default function VaultDashboard() {
               <div>
                 <label className="text-xs font-bold text-[#17211F]/60 uppercase ml-1">Password (Optional)</label>
                 <div className="relative">
-                  <input name="password" type={showCreatePassword ? "text" : "password"} placeholder="Leave empty for no password" className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#00A19B]/50 pr-10" />
+                  <input
+                    name="password"
+                    type={showCreatePassword ? "text" : "password"}
+                    placeholder="Leave empty for no password"
+                    autoComplete="new-password"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
+                    data-lpignore="true"
+                    data-1p-ignore="true"
+                    data-form-type="other"
+                    aria-autocomplete="none"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#00A19B]/50 pr-10"
+                  />
                   <button type="button" onClick={() => setShowCreatePassword(!showCreatePassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                     {showCreatePassword ? (
                       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M10.79 12.912l-1.614-1.615a3.5 3.5 0 0 1-4.474-4.474l-2.06-2.06C.938 6.278 0 8 0 8s3 5.5 8 5.5a7.029 7.029 0 0 0 2.79-.588zM5.21 3.088A7.028 7.028 0 0 1 8 2.5c5 0 8 5.5 8 5.5s-.939 1.721-2.641 3.238l-2.062-2.062a3.5 3.5 0 0 0-4.474-4.474L5.21 3.089z"/><path d="M5.525 7.646a2.5 2.5 0 0 0 2.829 2.829l-2.83-2.829zm4.95.708-2.829-2.83a2.5 2.5 0 0 1 2.829 2.829zm3.171 6-12-12 .708-.708 12 12-.708.708z"/></svg>
@@ -596,9 +609,25 @@ export default function VaultDashboard() {
               </div>
             </div>
             <h2 className="text-xl font-bold text-center text-[#17211F] mb-6">Locker Protected</h2>
-            <form onSubmit={handlePasswordSubmit} className="space-y-4">
+            <form onSubmit={handlePasswordSubmit} className="space-y-4" autoComplete="off">
               <div className="relative">
-                <input required autoFocus name="password" type={showPromptPassword ? "text" : "password"} placeholder="Enter locker password" className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#00A19B]/50 text-center pr-10" />
+                <input
+                  required
+                  autoFocus
+                  name="password"
+                  id="locker_password"
+                  type={showPromptPassword ? "text" : "password"}
+                  placeholder="Enter locker password"
+                  autoComplete="new-password"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                  data-lpignore="true"
+                  data-1p-ignore="true"
+                  data-form-type="other"
+                  aria-autocomplete="none"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#00A19B]/50 text-center pr-10"
+                />
                 <button type="button" onClick={() => setShowPromptPassword(!showPromptPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                   {showPromptPassword ? (
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M10.79 12.912l-1.614-1.615a3.5 3.5 0 0 1-4.474-4.474l-2.06-2.06C.938 6.278 0 8 0 8s3 5.5 8 5.5a7.029 7.029 0 0 0 2.79-.588zM5.21 3.088A7.028 7.028 0 0 1 8 2.5c5 0 8 5.5 8 5.5s-.939 1.721-2.641 3.238l-2.062-2.062a3.5 3.5 0 0 0-4.474-4.474L5.21 3.089z"/><path d="M5.525 7.646a2.5 2.5 0 0 0 2.829 2.829l-2.83-2.829zm4.95.708-2.829-2.83a2.5 2.5 0 0 1 2.829 2.829zm3.171 6-12-12 .708-.708 12 12-.708.708z"/></svg>
@@ -619,10 +648,10 @@ export default function VaultDashboard() {
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl p-8 w-full max-w-lg shadow-2xl relative">
             <h2 className="text-2xl font-bold text-[#17211F] mb-6">Edit Locker</h2>
-            <form onSubmit={handleEditSubmit} className="space-y-4">
+            <form onSubmit={handleEditSubmit} className="space-y-4" autoComplete="off">
               <div>
                 <label className="text-xs font-bold text-[#17211F]/60 uppercase ml-1">Title</label>
-                <input required defaultValue={editItem.title} name="title" className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#00A19B]/50" />
+                <input required defaultValue={editItem.title} name="title" autoComplete="off" className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#00A19B]/50" />
               </div>
               <div>
                 <label className="text-xs font-bold text-[#17211F]/60 uppercase ml-1">Content</label>
@@ -631,7 +660,21 @@ export default function VaultDashboard() {
               <div>
                 <label className="text-xs font-bold text-[#17211F]/60 uppercase ml-1">Password</label>
                 <div className="relative">
-                  <input defaultValue={editItem.enteredPassword || ""} name="password" type={showEditPassword ? "text" : "password"} placeholder="Leave empty to remove protection" className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#00A19B]/50 pr-10" />
+                  <input
+                    defaultValue={editItem.enteredPassword || ""}
+                    name="password"
+                    type={showEditPassword ? "text" : "password"}
+                    placeholder="Leave empty to remove protection"
+                    autoComplete="new-password"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
+                    data-lpignore="true"
+                    data-1p-ignore="true"
+                    data-form-type="other"
+                    aria-autocomplete="none"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#00A19B]/50 pr-10"
+                  />
                   <button type="button" onClick={() => setShowEditPassword(!showEditPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                     {showEditPassword ? (
                       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M10.79 12.912l-1.614-1.615a3.5 3.5 0 0 1-4.474-4.474l-2.06-2.06C.938 6.278 0 8 0 8s3 5.5 8 5.5a7.029 7.029 0 0 0 2.79-.588zM5.21 3.088A7.028 7.028 0 0 1 8 2.5c5 0 8 5.5 8 5.5s-.939 1.721-2.641 3.238l-2.062-2.062a3.5 3.5 0 0 0-4.474-4.474L5.21 3.089z"/><path d="M5.525 7.646a2.5 2.5 0 0 0 2.829 2.829l-2.83-2.829zm4.95.708-2.829-2.83a2.5 2.5 0 0 1 2.829 2.829zm3.171 6-12-12 .708-.708 12 12-.708.708z"/></svg>
