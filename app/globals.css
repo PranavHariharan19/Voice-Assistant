@@ -618,3 +618,11 @@ button:active:not(:disabled) {
   background: rgba(0, 161, 155, 0.6);
 }
 
+.vault-secure-input {
+  -webkit-text-security: disc !important;
+}
+
+.vault-secure-input-revealed {
+  -webkit-text-security: none !important;
+}
+

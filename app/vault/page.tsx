@@ -11,6 +11,15 @@ export default function VaultPage() {
   const [status, setStatus] = useState<"loading" | "needs_setup" | "ready" | "unauthorized">("ready");
   const [error, setError] = useState<string | null>(null);
   const [loadingAction, setLoadingAction] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [isTextSecuritySupported, setIsTextSecuritySupported] = useState(true);
+
+  useEffect(() => {
+    setIsTextSecuritySupported(
+      typeof window !== "undefined" &&
+      ("webkitTextSecurity" in document.documentElement.style || "-webkit-text-security" in document.documentElement.style)
+    );
+  }, []);
 
   useEffect(() => {
     try {
@@ -49,7 +58,7 @@ export default function VaultPage() {
     setError(null);
 
     const formData = new FormData(e.currentTarget);
-    const password = formData.get("password") as string;
+    const password = (formData.get("vault_auth_token") || formData.get("password")) as string;
     
     if (!password) {
       setError("Password is required");
@@ -112,24 +121,57 @@ export default function VaultPage() {
         </header>
 
         <form onSubmit={onSubmit} className="space-y-4" autoComplete="off">
+          {/* Decoy hidden inputs to prevent Chrome autofill heuristics from attaching to the real input */}
+          <div style={{ position: "absolute", left: "-9999px", opacity: 0, height: 0, width: 0, overflow: "hidden" }} aria-hidden="true">
+            <input type="text" name="fake_user" tabIndex={-1} autoComplete="off" />
+            <input type="password" name="fake_pass" tabIndex={-1} autoComplete="off" />
+          </div>
+
           <div className="space-y-1">
             <label className="text-xs font-bold text-[#17211F]/60 uppercase ml-1">Master Password</label>
-            <input
-              required
-              autoFocus
-              autoComplete="new-password"
-              autoCorrect="off"
-              autoCapitalize="off"
-              spellCheck={false}
-              data-lpignore="true"
-              data-1p-ignore="true"
-              data-form-type="other"
-              aria-autocomplete="none"
-              name="password"
-              type="password"
-              placeholder="••••••••"
-              className="w-full bg-white/50 border border-[#17211F]/10 rounded-2xl px-5 py-3 text-sm font-medium focus:outline-none focus:border-[#00A19B] focus:ring-4 focus:ring-[#00A19B]/10 transition-all text-[#17211F]"
-            />
+            <div className="relative">
+              <input
+                required
+                autoFocus
+                name="vault_auth_token"
+                id="vault_auth_token"
+                type={isTextSecuritySupported ? "text" : (showPassword ? "text" : "password")}
+                autoComplete="one-time-code"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
+                data-lpignore="true"
+                data-1p-ignore="true"
+                data-form-type="other"
+                aria-autocomplete="none"
+                placeholder="••••••••"
+                style={{
+                  WebkitTextSecurity: showPassword ? "none" : "disc",
+                } as React.CSSProperties}
+                className={`w-full bg-white/50 border border-[#17211F]/10 rounded-2xl px-5 py-3 pr-11 text-sm font-medium focus:outline-none focus:border-[#00A19B] focus:ring-4 focus:ring-[#00A19B]/10 transition-all text-[#17211F] ${
+                  showPassword ? "vault-secure-input-revealed" : "vault-secure-input"
+                }`}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                tabIndex={-1}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#17211F]/40 hover:text-[#17211F] p-1 transition-colors"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M10.79 12.912l-1.614-1.615a3.5 3.5 0 0 1-4.474-4.474l-2.06-2.06C.938 6.278 0 8 0 8s3 5.5 8 5.5a7.029 7.029 0 0 0 2.79-.588zM5.21 3.088A7.028 7.028 0 0 1 8 2.5c5 0 8 5.5 8 5.5s-.939 1.721-2.641 3.238l-2.062-2.062a3.5 3.5 0 0 0-4.474-4.474L5.21 3.089z"/>
+                    <path d="M5.525 7.646a2.5 2.5 0 0 0 2.829 2.829l-2.83-2.829zm4.95.708-2.829-2.83a2.5 2.5 0 0 1 2.829 2.829zm3.171 6-12-12 .708-.708 12 12-.708.708z"/>
+                  </svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M10.5 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0z"/>
+                    <path d="M0 8s3-5.5 8-5.5S16 8 16 8s-3 5.5-8 5.5S0 8 0 8zm8 3.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/>
+                  </svg>
+                )}
+              </button>
+            </div>
           </div>
 
           {error && (
