@@ -476,6 +476,27 @@ button:active:not(:disabled) {
   animation-delay: 200ms;
 }
 
+@keyframes premium-reveal {
+  0% {
+    opacity: 0;
+    transform: translateY(22px) scale(0.96);
+    filter: blur(6px);
+  }
+  50% {
+    filter: blur(0px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0px);
+  }
+}
+
+.animate-premium-reveal {
+  animation: premium-reveal 0.65s cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity, filter;
+}
+
 @keyframes rise-in {
   from {
     opacity: 0;

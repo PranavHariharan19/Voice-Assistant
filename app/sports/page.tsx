@@ -32,7 +32,79 @@ type FavoriteEntity = {
 
 const SPORTS_FILTERS = ["all", "football", "cricket", "f1", "kabaddi"];
 
-function SortableItem({ entity, onClick, isSelected }: { entity: FavoriteEntity; onClick: () => void; isSelected: boolean }) {
+function getSportMeta(sport: string) {
+  switch (sport.toLowerCase()) {
+    case "football":
+      return {
+        label: "Football",
+        icon: (
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="m4.93 4.93 4.24 4.24m5.66 0 4.24-4.24m-14.14 14.14 4.24-4.24m5.66 0 4.24 4.24"/>
+            <polygon points="12,7 16,10 14.5,15 9.5,15 8,10"/>
+          </svg>
+        ),
+        badgeClass: "bg-emerald-500/10 text-emerald-700 border-emerald-500/20",
+        glowGradient: "from-emerald-500/20 via-[#00A19B]/10 to-transparent",
+      };
+    case "cricket":
+      return {
+        label: "Cricket",
+        icon: (
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="9"/>
+            <path d="M7 7l10 10M17 7L7 17" strokeDasharray="2 2"/>
+          </svg>
+        ),
+        badgeClass: "bg-amber-500/10 text-amber-800 border-amber-500/20",
+        glowGradient: "from-amber-500/20 via-[#00A19B]/10 to-transparent",
+      };
+    case "f1":
+      return {
+        label: "Formula 1",
+        icon: (
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
+            <line x1="4" y1="22" x2="4" y2="15"/>
+          </svg>
+        ),
+        badgeClass: "bg-rose-500/10 text-rose-700 border-rose-500/20",
+        glowGradient: "from-rose-500/20 via-[#00A19B]/10 to-transparent",
+      };
+    case "kabaddi":
+      return {
+        label: "Kabaddi",
+        icon: (
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="5" r="3"/>
+            <path d="M7 21l3-7 4 3 3-7"/>
+            <path d="M4 11h7l4-4"/>
+          </svg>
+        ),
+        badgeClass: "bg-purple-500/10 text-purple-700 border-purple-500/20",
+        glowGradient: "from-purple-500/20 via-[#00A19B]/10 to-transparent",
+      };
+    default:
+      return {
+        label: sport,
+        icon: null,
+        badgeClass: "bg-[#00A19B]/10 text-[#00A19B] border-[#00A19B]/20",
+        glowGradient: "from-[#00A19B]/20 to-transparent",
+      };
+  }
+}
+
+function SortableItem({
+  entity,
+  index = 0,
+  onClick,
+  isSelected,
+}: {
+  entity: FavoriteEntity;
+  index?: number;
+  onClick: () => void;
+  isSelected: boolean;
+}) {
   const {
     attributes,
     listeners,
@@ -42,74 +114,130 @@ function SortableItem({ entity, onClick, isSelected }: { entity: FavoriteEntity;
     isDragging,
   } = useSortable({ id: entity.id });
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
+  // Only apply transform and transition when actively dragging or displaced by another item
+  // Keeping them undefined when resting prevents dnd-kit from triggering a glitchy layout animation on mount
+  const style: React.CSSProperties = {
+    transform: transform ? CSS.Transform.toString(transform) : undefined,
+    transition: transform ? transition : undefined,
     zIndex: isDragging ? 50 : 1,
   };
+
+  const meta = getSportMeta(entity.sport);
 
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={`group relative overflow-hidden rounded-2xl p-6 cursor-pointer active:scale-[0.98] transition-all duration-200 select-none ${
-        isSelected
-          ? "border-2 border-[#00A19B] bg-[#00A19B]/10 shadow-lg shadow-[#00A19B]/20 scale-[1.02]"
-          : "bg-white/70 border border-white shadow-sm hover:-translate-y-1 hover:bg-white hover:shadow-xl hover:shadow-[#00A19B]/10"
-      } ${isDragging ? "shadow-2xl ring-2 ring-[#00A19B] opacity-80 z-50 cursor-grabbing" : ""}`}
-      onClick={onClick}
+      className={`relative select-none ${isDragging ? "z-50 opacity-90 scale-[1.03]" : ""}`}
     >
-      <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-gradient-to-br from-[#00A19B]/20 to-transparent blur-2xl transition-transform duration-500 group-hover:scale-150 pointer-events-none"></div>
+      <div
+        style={{
+          animationDelay: `${Math.min(index * 50, 450)}ms`,
+        }}
+        onClick={onClick}
+        className={`animate-premium-reveal group relative overflow-hidden rounded-2xl p-6 cursor-pointer border transition-all duration-300 ${
+          isSelected
+            ? "border-[#00A19B] bg-gradient-to-br from-[#00A19B]/15 via-white/90 to-[#00A19B]/5 shadow-xl shadow-[#00A19B]/20 scale-[1.02] ring-2 ring-[#00A19B]/40"
+            : "bg-white/75 backdrop-blur-md border-white/80 shadow-[0_4px_20px_-4px_rgba(23,33,31,0.06)] hover:-translate-y-1.5 hover:bg-white/95 hover:border-[#00A19B]/30 hover:shadow-[0_20px_40px_-15px_rgba(0,161,155,0.18)]"
+        } ${isDragging ? "shadow-2xl ring-2 ring-[#00A19B] cursor-grabbing" : ""}`}
+      >
+        {/* Subtle ambient light orb */}
+        <div
+          className={`absolute -right-8 -top-8 h-32 w-32 rounded-full bg-gradient-to-br ${meta.glowGradient} blur-2xl transition-all duration-500 group-hover:scale-150 group-hover:opacity-100 opacity-60 pointer-events-none`}
+        />
 
-      <div className="relative z-10 flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <span className="inline-flex items-center rounded-full bg-[#17211f]/5 px-2.5 py-0.5 text-xs font-semibold capitalize text-[#00A19B]">
-            {entity.sport}
-          </span>
-          <div
-            {...attributes}
-            {...listeners}
-            onClick={(e) => e.stopPropagation()}
-            className="p-1.5 -mr-1.5 rounded-lg text-[#17211f]/30 hover:text-[#17211f]/70 hover:bg-[#17211f]/5 transition-colors cursor-grab active:cursor-grabbing"
-            title="Drag to reorder"
-            aria-label="Drag to reorder"
-          >
-            <svg
-              className="w-5 h-5 transition-opacity"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={2}
-              stroke="currentColor"
+        <div className="relative z-10 flex flex-col gap-3.5">
+          <div className="flex items-center justify-between">
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold border capitalize shadow-2xs ${meta.badgeClass}`}
             >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 9h16.5m-16.5 6.75h16.5" />
-            </svg>
+              {meta.icon}
+              <span>{meta.label}</span>
+            </span>
+
+            {/* Tactile drag grip */}
+            <div
+              {...attributes}
+              {...listeners}
+              onClick={(e) => e.stopPropagation()}
+              className="p-1.5 -mr-1.5 rounded-lg text-[#17211f]/30 hover:text-[#17211f]/80 hover:bg-[#17211f]/5 transition-colors cursor-grab active:cursor-grabbing"
+              title="Drag to reorder"
+              aria-label="Drag to reorder"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
+                <circle cx="5" cy="4" r="1.5" />
+                <circle cx="11" cy="4" r="1.5" />
+                <circle cx="5" cy="8" r="1.5" />
+                <circle cx="11" cy="8" r="1.5" />
+                <circle cx="5" cy="12" r="1.5" />
+                <circle cx="11" cy="12" r="1.5" />
+              </svg>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-xl font-bold tracking-tight text-[#17211f] line-clamp-2 group-hover:text-[#00A19B] transition-colors">
+              {entity.entity_name}
+            </h3>
+          </div>
+
+          <div className="flex items-center justify-between pt-1 border-t border-[#17211f]/5 mt-1">
+            <span className="text-[11px] font-semibold text-[#17211f]/50 group-hover:text-[#00A19B] transition-colors flex items-center gap-1">
+              <span>View schedule</span>
+              <svg
+                className="w-3.5 h-3.5 transition-transform duration-300 group-hover:translate-x-1"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth="2.5"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+              </svg>
+            </span>
+
+            {isSelected && (
+              <span className="flex h-2 w-2 rounded-full bg-[#00A19B] animate-pulse" />
+            )}
           </div>
         </div>
-        <h3 className="text-xl font-bold tracking-tight text-[#17211f] line-clamp-2">
-          {entity.entity_name}
-        </h3>
       </div>
     </div>
   );
 }
 
+
 export default function SportsPage() {
   const { user, loading: authLoading, initialized } = useAuth();
   const router = useRouter();
 
-  const [entities, setEntities] = useState<FavoriteEntity[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [entities, setEntities] = useState<FavoriteEntity[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem("cachedFavoriteEntities");
+        if (cached) return JSON.parse(cached);
+      } catch {}
+    }
+    return [];
+  });
+  const [loading, setLoading] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem("cachedFavoriteEntities");
+        if (cached && JSON.parse(cached).length > 0) return false;
+      } catch {}
+    }
+    return true;
+  });
 
   useEffect(() => {
     try {
       const cached = localStorage.getItem("cachedFavoriteEntities");
-      if (cached) {
+      if (cached && entities.length === 0) {
         setEntities(JSON.parse(cached));
         setLoading(false);
       }
     } catch {}
-  }, []);
+  }, [entities.length]);
 
   const [filter, setFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -212,7 +340,15 @@ export default function SportsPage() {
           console.error("Error saving entities cache", e);
         }
 
-        setEntities(withIds);
+        setEntities((current) => {
+          if (
+            current.length === withIds.length &&
+            current.every((item, i) => item.id === withIds[i].id && item.entity_name === withIds[i].entity_name)
+          ) {
+            return current;
+          }
+          return withIds;
+        });
       }
       setLoading(false);
     }
@@ -557,8 +693,26 @@ export default function SportsPage() {
 
         {/* Content */}
         {loading ? (
-          <div className="flex justify-center py-20">
-            <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#00A19B] border-t-transparent"></div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div
+                key={i}
+                className="rounded-2xl p-6 bg-white/40 border border-white/60 shadow-sm backdrop-blur-sm animate-pulse flex flex-col gap-4"
+                style={{ animationDelay: `${i * 60}ms` }}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="h-5 w-20 bg-[#17211f]/10 rounded-full" />
+                  <div className="h-5 w-5 bg-[#17211f]/10 rounded-md" />
+                </div>
+                <div className="space-y-2 pt-1">
+                  <div className="h-6 w-3/4 bg-[#17211f]/10 rounded-lg" />
+                  <div className="h-4 w-1/2 bg-[#17211f]/5 rounded-md" />
+                </div>
+                <div className="pt-3 border-t border-[#17211f]/5 flex justify-between items-center">
+                  <div className="h-3 w-24 bg-[#17211f]/10 rounded-full" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : filteredEntities.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-3xl bg-white/40 py-20 text-center shadow-sm backdrop-blur-sm border border-white/50">
@@ -577,13 +731,14 @@ export default function SportsPage() {
           </div>
         ) : (
           <div className="flex justify-between gap-8 items-start h-full pb-10">
-            <div className={`flex-1 transition-all duration-500 ${selectedEntity ? 'w-full lg:max-w-[55%]' : 'w-full'}`}>
+            <div className={`flex-1 transition-[max-width,width] duration-500 ${selectedEntity ? 'w-full lg:max-w-[55%]' : 'w-full'}`}>
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={filteredEntities.map((e) => e.id)} strategy={rectSortingStrategy}>
                   <div className={`grid grid-cols-1 gap-6 ${selectedEntity ? 'sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3' : 'sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}`}>
-                    {filteredEntities.map((entity) => (
+                    {filteredEntities.map((entity, index) => (
                       <SortableItem 
                         key={entity.id} 
+                        index={index}
                         entity={entity} 
                         isSelected={selectedEntity?.id === entity.id}
                         onClick={() => handleSelectEntity(entity)} 
