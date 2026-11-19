@@ -462,6 +462,10 @@ export default function Home() {
               localStorage.removeItem(ROUTINE_STORAGE_KEY);
             } catch {}
             return;
+          } else if (insertErr) {
+            console.error("Failed to migrate routine tasks to Supabase:", insertErr);
+            if (isMounted) setRoutineTasks(localTasks);
+            return;
           }
         }
 

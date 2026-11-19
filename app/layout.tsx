@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
+import LiveScoreWidget from "@/components/live-score-widget";
 
 export const metadata: Metadata = {
   title: "Mint Assistant & Calendar",
@@ -27,6 +28,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <AuthProvider>
           {children}
+          <LiveScoreWidget />
         </AuthProvider>
       </body>
     </html>

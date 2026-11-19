@@ -15,9 +15,11 @@ function formatEspnSoccerMatch(match: any) {
     : (venueCity || "TBA");
 
   let title = match.name;
+  let homeComp: any = null;
+  let awayComp: any = null;
   if (competition?.competitors && competition.competitors.length >= 2) {
-    const homeComp = competition.competitors.find((c: any) => c.homeAway === "home");
-    const awayComp = competition.competitors.find((c: any) => c.homeAway === "away");
+    homeComp = competition.competitors.find((c: any) => c.homeAway === "home") || competition.competitors[0];
+    awayComp = competition.competitors.find((c: any) => c.homeAway === "away") || competition.competitors[1];
     if (homeComp && awayComp) {
       const leagueName = match.league?.name || "";
       title = `${homeComp.team?.displayName || "TBA"} vs ${awayComp.team?.displayName || "TBA"}${
@@ -25,6 +27,13 @@ function formatEspnSoccerMatch(match: any) {
       }`;
     }
   }
+
+  const state = match.status?.type?.state;
+  const isLive = state === "in";
+  const shortDetail = match.status?.type?.shortDetail || match.status?.type?.detail || (isLive ? "LIVE" : state === "post" ? "FT" : undefined);
+  const homeScore = homeComp?.score !== undefined ? String(homeComp.score) : undefined;
+  const awayScore = awayComp?.score !== undefined ? String(awayComp.score) : undefined;
+  const summaryScore = (homeScore !== undefined && awayScore !== undefined) ? `${homeScore} - ${awayScore}` : undefined;
 
   return {
     id: String(match.id),
@@ -42,7 +51,14 @@ function formatEspnSoccerMatch(match: any) {
       hour12: false
     }).format(d),
     venue: venue,
-    timestamp: d.getTime()
+    timestamp: d.getTime(),
+    sport: "football",
+    isLive,
+    status: state,
+    statusDetail: shortDetail,
+    homeTeam: homeComp ? { name: homeComp.team?.displayName || "Home", score: homeScore } : undefined,
+    awayTeam: awayComp ? { name: awayComp.team?.displayName || "Away", score: awayScore } : undefined,
+    summaryScore,
   };
 }
 
@@ -373,7 +389,8 @@ export async function GET(request: NextRequest) {
             date: new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric' }).format(d),
             time: new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false }).format(d),
             venue: venue,
-            timestamp: d.getTime()
+            timestamp: d.getTime(),
+            sport: 'cricket'
           };
         }).sort((a: any, b: any) => a.timestamp - b.timestamp);
       } else {
@@ -430,7 +447,8 @@ export async function GET(request: NextRequest) {
             title: race.raceName,
             date: dateIST,
             time: timeIST,
-            venue: race.Circuit.circuitName
+            venue: race.Circuit.circuitName,
+            sport: 'f1'
           };
         });
       } else {

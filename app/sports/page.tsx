@@ -22,6 +22,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { usePinnedMatches } from "@/lib/live-score-store";
 
 type FavoriteEntity = {
   id: string;
@@ -209,6 +210,7 @@ function SortableItem({
 export default function SportsPage() {
   const { user, loading: authLoading, initialized } = useAuth();
   const router = useRouter();
+  const { pinMatch, unpinMatch, isPinned } = usePinnedMatches();
 
   const [entities, setEntities] = useState<FavoriteEntity[]>(() => {
     if (typeof window !== "undefined") {
@@ -827,7 +829,9 @@ export default function SportsPage() {
                         <p className="text-red-600 font-medium">{scheduleError}</p>
                       </div>
                     ) : filteredSchedule.length > 0 ? (
-                      filteredSchedule.map((match: any, i: number) => (
+                      filteredSchedule.map((match: any, i: number) => {
+                        const pinned = isPinned(String(match.id), match.title);
+                        return (
                         <div key={match.id || i} onClick={() => {
                             if (!isAddMode) return;
                             const key = match.id || match.title;
@@ -837,11 +841,11 @@ export default function SportsPage() {
                                else next.add(key);
                                return next;
                             });
-                        }} className={`relative bg-white rounded-2xl p-5 shadow-sm border ${selectedMatches.has(match.id || match.title) ? 'border-[#00A19B] bg-[#00A19B]/5' : 'border-[#17211f]/5'} hover:shadow-md transition-shadow flex items-start gap-4 ${isAddMode ? 'cursor-pointer' : ''}`}>
+                        }} className={`relative bg-white rounded-2xl p-5 shadow-sm border ${selectedMatches.has(match.id || match.title) ? 'border-[#00A19B] bg-[#00A19B]/5' : pinned ? 'border-[#00A19B]/60 ring-1 ring-[#00A19B]/30' : 'border-[#17211f]/5'} hover:shadow-md transition-all flex items-start gap-4 ${isAddMode ? 'cursor-pointer' : ''}`}>
                           {isAddMode && (
                             <div className="pt-1">
                               <input 
-                                type="checkbox"
+                                type="checkbox" 
                                 checked={selectedMatches.has(match.id || match.title)}
                                 onChange={() => {}} 
                                 className="w-5 h-5 rounded border-[#17211f]/20 text-[#00A19B] focus:ring-[#00A19B] pointer-events-none"
@@ -849,17 +853,65 @@ export default function SportsPage() {
                             </div>
                           )}
                           <div className="flex-1">
-                            <div className="flex items-start justify-between gap-4 mb-3">
-                              <h4 className="font-bold text-[#17211f] pr-16">{match.title}</h4>
-                              {isToday(match.date) ? (
-                                <span className="absolute top-4 right-4 inline-flex items-center rounded-full bg-yellow-500/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-yellow-600">
-                                  Today
-                                </span>
-                              ) : isThisWeek(match.date) ? (
-                                <span className="absolute top-4 right-4 inline-flex items-center rounded-full bg-[#00A19B]/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#00A19B]">
-                                  This week
-                                </span>
-                              ) : null}
+                            <div className="flex items-start justify-between gap-3 mb-2">
+                              <div>
+                                <h4 className="font-bold text-[#17211f] pr-2 leading-snug">{match.title}</h4>
+                                {match.summaryScore && (
+                                  <span className="text-xs font-bold text-[#00A19B] tracking-wide mt-0.5 inline-block">
+                                    Score: {match.summaryScore}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (pinned) {
+                                      unpinMatch(String(match.id || match.title));
+                                    } else {
+                                      pinMatch({
+                                        id: String(match.id || match.title),
+                                        title: match.title,
+                                        sport: match.sport || selectedEntity?.sport || "football",
+                                        entityName: selectedEntity?.entity_name,
+                                        date: match.date,
+                                        time: match.time,
+                                        venue: match.venue,
+                                        timestamp: match.timestamp,
+                                        isLive: !!match.isLive,
+                                        statusDetail: match.statusDetail,
+                                        summaryScore: match.summaryScore,
+                                        homeTeam: match.homeTeam,
+                                        awayTeam: match.awayTeam,
+                                      });
+                                    }
+                                  }}
+                                  className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                                    pinned
+                                      ? "bg-[#00A19B] text-white shadow-sm"
+                                      : "bg-[#17211f]/5 text-[#17211f]/70 hover:bg-[#17211f]/10 hover:text-[#17211f]"
+                                  }`}
+                                  title={pinned ? "Unpin match" : "Pin live score"}
+                                >
+                                  <span>📌</span>
+                                  <span>{pinned ? "Pinned" : "Pin"}</span>
+                                </button>
+                                {match.isLive ? (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-red-600 animate-pulse">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-red-500"></span>
+                                    LIVE
+                                  </span>
+                                ) : isToday(match.date) ? (
+                                  <span className="inline-flex items-center rounded-full bg-yellow-500/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-yellow-600">
+                                    Today
+                                  </span>
+                                ) : isThisWeek(match.date) ? (
+                                  <span className="inline-flex items-center rounded-full bg-[#00A19B]/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#00A19B]">
+                                    This week
+                                  </span>
+                                ) : null}
+                              </div>
                             </div>
                             <div className="flex items-center gap-2 text-sm text-[#17211f]/60 mb-2">
                               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
@@ -877,7 +929,8 @@ export default function SportsPage() {
                             )}
                           </div>
                         </div>
-                      ))
+                      );
+                    })
                     ) : (
                       <div className="flex-1 flex flex-col items-center justify-center text-center p-6 bg-white/50 rounded-2xl">
                         <p className="text-[#17211f]/60">No upcoming schedule found.</p>
