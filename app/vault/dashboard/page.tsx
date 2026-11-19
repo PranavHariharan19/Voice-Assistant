@@ -663,14 +663,7 @@ export default function VaultDashboard() {
                     </div>
                   )}
 
-                <div>
-                  <h2 className="text-xl font-bold text-[#17211F] mt-4 line-clamp-2">{item.title}</h2>
-                  <div className="flex items-center gap-1.5 mt-2">
-                    <span className="text-[10px] font-bold text-[#00A19B] bg-[#00A19B]/10 px-2 py-0.5 rounded-full">
-                      {item.requires_item_password ? "🔒 Protected" : "📁 Encrypted"}
-                    </span>
-                  </div>
-                </div>
+                <h2 className="text-xl font-bold text-[#17211F] mt-4 line-clamp-2">{item.title}</h2>
                 <div className="text-right text-xs font-bold text-[#17211F]/40 mt-auto">
                   {new Date(item.created_at).toLocaleDateString()} {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </div>
