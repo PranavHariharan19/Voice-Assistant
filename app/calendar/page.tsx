@@ -39,11 +39,17 @@ type CalendarEvent = {
   status: "pending" | "completed" | "missed";
 };
 
+type RecurrenceFrequency = "daily" | "weekly" | "monthly" | "annually" | "custom";
+
 type EventFormValues = {
   name: string;
   date: string;
   time: string;
   additionalInformation: string;
+  isRecurring?: boolean;
+  recurrenceFrequency?: RecurrenceFrequency;
+  recurrenceCustom?: string;
+  recurrenceOccurrences?: number;
 };
 
 type EventFormMode = "add" | "reschedule" | null;
@@ -129,7 +135,76 @@ function createEmptyForm(date: string): EventFormValues {
     date,
     time: "",
     additionalInformation: "",
+    isRecurring: false,
+    recurrenceFrequency: "daily",
+    recurrenceCustom: "Every 2 days once",
+    recurrenceOccurrences: 10,
   };
+}
+
+function parseRecurrenceRule(
+  frequency: RecurrenceFrequency = "daily",
+  customText?: string
+): { interval: number; unit: "day" | "week" | "month" | "year"; label: string } {
+  if (frequency === "daily") return { interval: 1, unit: "day", label: "Daily" };
+  if (frequency === "weekly") return { interval: 1, unit: "week", label: "Weekly" };
+  if (frequency === "monthly") return { interval: 1, unit: "month", label: "Monthly" };
+  if (frequency === "annually") return { interval: 1, unit: "year", label: "Annually" };
+
+  const text = (customText || "").trim().toLowerCase();
+  if (text.includes("other day")) return { interval: 2, unit: "day", label: "Every 2 days" };
+  if (text.includes("other week")) return { interval: 2, unit: "week", label: "Every 2 weeks" };
+  if (text.includes("other month")) return { interval: 2, unit: "month", label: "Every 2 months" };
+
+  const match = text.match(/(\d+)\s*(day|week|month|year)s?/i);
+  if (match) {
+    const count = parseInt(match[1], 10);
+    const rawUnit = match[2].toLowerCase();
+    const unit = rawUnit.startsWith("day")
+      ? "day"
+      : rawUnit.startsWith("week")
+      ? "week"
+      : rawUnit.startsWith("month")
+      ? "month"
+      : "year";
+    return { interval: Math.max(1, count), unit, label: customText?.trim() || `Every ${count} ${unit}s` };
+  }
+
+  const justNum = text.match(/(\d+)/);
+  if (justNum) {
+    const count = parseInt(justNum[1], 10);
+    return { interval: Math.max(1, count), unit: "day", label: `Every ${count} days` };
+  }
+
+  return { interval: 1, unit: "day", label: customText?.trim() || "Custom recurrence" };
+}
+
+function generateRecurringDates(
+  startDateStr: string,
+  frequency: RecurrenceFrequency = "daily",
+  customText?: string,
+  totalOccurrences: number = 10
+): { rule: { interval: number; unit: string; label: string }; dates: string[] } {
+  const rule = parseRecurrenceRule(frequency, customText);
+  const [startY, startM, startD] = startDateStr.split("-").map(Number);
+  const dates: string[] = [startDateStr];
+  let currentDate = new Date(startY, startM - 1, startD);
+
+  const count = Math.min(Math.max(2, totalOccurrences), 60);
+  for (let i = 1; i < count; i++) {
+    if (rule.unit === "day") {
+      currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate() + rule.interval);
+    } else if (rule.unit === "week") {
+      currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate() + (rule.interval * 7));
+    } else if (rule.unit === "month") {
+      currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + rule.interval, startD);
+    } else if (rule.unit === "year") {
+      currentDate = new Date(currentDate.getFullYear() + rule.interval, startM - 1, startD);
+    }
+    dates.push(dateKey(currentDate));
+  }
+
+  return { rule, dates };
 }
 
 function parseDateKey(value: string) {
@@ -178,13 +253,16 @@ function mapEventRow(row: EventRow): CalendarEvent {
     if (local === "completed" || local === "missed") savedStatus = local;
   }
 
+  const rawInfo = row.additional_info ?? "";
+  const cleanLocation = rawInfo.replace(/\[Repeats:\s*[^\]]+\]/g, "").trim();
+
   return {
     id: row.event_id,
     title: row.event_name,
     time: row.event_time?.slice(0, 5) ?? "",
-    location: row.additional_info ?? "",
+    location: cleanLocation,
     date: row.event_date,
-    additionalInformation: row.additional_info ?? "",
+    additionalInformation: rawInfo,
     tone: "mint",
     status: savedStatus,
   };
@@ -1243,6 +1321,10 @@ export default function Home() {
             date: displayDate(selectedEvent.date),
             time: selectedEvent.time,
             additionalInformation: selectedEvent.additionalInformation,
+            isRecurring: false,
+            recurrenceFrequency: "daily",
+            recurrenceCustom: "Every 2 days once",
+            recurrenceOccurrences: 10,
           }
         : createEmptyForm(displayDate(dateKey(selectedDate))),
     );
@@ -1399,6 +1481,69 @@ export default function Home() {
     };
 
     if (formMode === "add") {
+      if (formValues.isRecurring) {
+        const { rule, dates } = generateRecurringDates(
+          eventDate,
+          formValues.recurrenceFrequency || "daily",
+          formValues.recurrenceCustom,
+          formValues.recurrenceOccurrences || 10,
+        );
+
+        const recurrenceNote = `[Repeats: ${rule.label}]`;
+        const baseInfo = formValues.additionalInformation.trim();
+        const combinedNotes = baseInfo ? `${baseInfo}\n${recurrenceNote}` : recurrenceNote;
+
+        const payloads = dates.map((d) => ({
+          event_name: formValues.name.trim(),
+          event_date: d,
+          event_time: formValues.time || null,
+          additional_info: combinedNotes,
+          user_id: user?.id,
+        }));
+
+        const { data, error } = await supabase
+          .from("events")
+          .insert(payloads)
+          .select("event_id,event_name,event_date,event_time,additional_info");
+
+        setIsSubmitting(false);
+
+        if (error) {
+          console.error("Could not add recurring events:", error.message);
+          window.alert("Could not add recurring events: " + error.message);
+          return;
+        }
+
+        const insertedRows = (data ?? []) as EventRow[];
+        const nextEvents = insertedRows.map((row) => mapEventRow(row));
+
+        setEventsByDate((current) => {
+          const updated = { ...current };
+          for (const ev of nextEvents) {
+            updated[ev.date] = [...(updated[ev.date] ?? []), ev];
+          }
+          try {
+            localStorage.setItem("cached_calendar_events", JSON.stringify(updated));
+          } catch {}
+          return updated;
+        });
+
+        if (nextEvents.length > 0) {
+          const firstEvent = nextEvents[0];
+          setSelectedDate(parseDateKey(firstEvent.date));
+          setActiveMonth(
+            new Date(
+              parseDateKey(firstEvent.date).getFullYear(),
+              parseDateKey(firstEvent.date).getMonth(),
+              1,
+            ),
+          );
+          setSelectedEventId(firstEvent.id);
+        }
+        setFormMode(null);
+        return;
+      }
+
       const { data, error } = await supabase
         .from("events")
         .insert(payload)
@@ -1414,10 +1559,16 @@ export default function Home() {
 
       const nextEvent = mapEventRow(data as EventRow);
 
-      setEventsByDate((current) => ({
-        ...current,
-        [nextEvent.date]: [...(current[nextEvent.date] ?? []), nextEvent],
-      }));
+      setEventsByDate((current) => {
+        const updated = {
+          ...current,
+          [nextEvent.date]: [...(current[nextEvent.date] ?? []), nextEvent],
+        };
+        try {
+          localStorage.setItem("cached_calendar_events", JSON.stringify(updated));
+        } catch {}
+        return updated;
+      });
       setSelectedDate(parseDateKey(nextEvent.date));
       setActiveMonth(
         new Date(
@@ -1981,6 +2132,98 @@ export default function Home() {
                       }
                     />
                   </label>
+
+                  {formMode === "add" && (
+                    <div className="flex flex-col gap-3 rounded-2xl border border-[#17211f]/10 bg-black/[0.02] p-3.5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" className="text-[#00A19B]">
+                            <path d="M11 5.466V4H5a4 4 0 0 0-3.5 6.055 1 1 0 1 1-1.732 1A6 6 0 0 1 5 2h6V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384l-2.36 1.966a.25.25 0 0 1-.41-.192Zm3 5.068A6 6 0 0 1 11 14H5v1.466a.25.25 0 0 1-.41.192l-2.36-1.966a.25.25 0 0 1 0-.384l2.36-1.966a.25.25 0 0 1 .41.192V12h6a4 4 0 0 0 3.5-6.055 1 1 0 1 1 1.732-1A6 6 0 0 1 14 10.534Z"/>
+                          </svg>
+                          <span className="text-xs md:text-sm font-bold text-[#17211f]">Repeat event</span>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer m-0">
+                          <input
+                            type="checkbox"
+                            checked={formValues.isRecurring ?? false}
+                            onChange={(e) =>
+                              setFormValues((curr) => ({
+                                ...curr,
+                                isRecurring: e.target.checked,
+                              }))
+                            }
+                            className="sr-only peer"
+                          />
+                          <div className="w-10 h-6 bg-[#17211f]/20 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#00A19B]"></div>
+                        </label>
+                      </div>
+
+                      {formValues.isRecurring && (
+                        <div className="flex flex-col gap-3 pt-3 border-t border-[#17211f]/10">
+                          <div>
+                            <span className="text-xs font-semibold text-[#17211f]/70 block mb-1.5">Period of recurrence</span>
+                            <select
+                              value={formValues.recurrenceFrequency || "daily"}
+                              onChange={(e) =>
+                                setFormValues((curr) => ({
+                                  ...curr,
+                                  recurrenceFrequency: e.target.value as RecurrenceFrequency,
+                                }))
+                              }
+                              className="w-full rounded-xl border border-[#17211f]/15 bg-white px-3 py-2.5 text-sm text-[#17211f] font-medium focus:border-[#00A19B] focus:outline-none cursor-pointer"
+                            >
+                              <option value="daily">Daily</option>
+                              <option value="weekly">Weekly</option>
+                              <option value="monthly">Monthly</option>
+                              <option value="annually">Annually</option>
+                              <option value="custom">Custom</option>
+                            </select>
+                          </div>
+
+                          {formValues.recurrenceFrequency === "custom" && (
+                            <div>
+                              <span className="text-xs font-semibold text-[#17211f]/70 block mb-1.5">Custom recurrence interval</span>
+                              <input
+                                type="text"
+                                placeholder='e.g. "Every 2 days once", "Every 3 weeks"'
+                                value={formValues.recurrenceCustom ?? ""}
+                                onChange={(e) =>
+                                  setFormValues((curr) => ({
+                                    ...curr,
+                                    recurrenceCustom: e.target.value,
+                                  }))
+                                }
+                                className="w-full rounded-xl border border-[#17211f]/15 bg-white px-3 py-2.5 text-sm text-[#17211f] focus:border-[#00A19B] focus:outline-none"
+                              />
+                              <p className="mt-1 text-[11px] text-[#17211f]/60">
+                                Supports phrases like &ldquo;Every 2 days once&rdquo;, &ldquo;Every 3 weeks&rdquo;, &ldquo;Every other day&rdquo;, etc.
+                              </p>
+                            </div>
+                          )}
+
+                          <div>
+                            <span className="text-xs font-semibold text-[#17211f]/70 block mb-1.5">Occurrences</span>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="number"
+                                min={2}
+                                max={60}
+                                value={formValues.recurrenceOccurrences ?? 10}
+                                onChange={(e) =>
+                                  setFormValues((curr) => ({
+                                    ...curr,
+                                    recurrenceOccurrences: Math.max(2, Math.min(60, parseInt(e.target.value, 10) || 2)),
+                                  }))
+                                }
+                                className="w-24 rounded-xl border border-[#17211f]/15 bg-white px-3 py-2 text-sm text-[#17211f] font-medium focus:border-[#00A19B] focus:outline-none"
+                              />
+                              <span className="text-xs text-[#17211f]/60 font-medium">occurrences in calendar</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   <label>
                     <span>Notes</span>
@@ -2648,6 +2891,12 @@ function EventDetailsPanel({
   event: CalendarEvent;
   onClose: () => void;
 }) {
+  const repeatsMatch = event.additionalInformation?.match(/\[Repeats:\s*([^\]]+)\]/);
+  const recurrenceLabel = repeatsMatch ? repeatsMatch[1] : null;
+  const cleanNotes = event.additionalInformation
+    ? event.additionalInformation.replace(/\[Repeats:\s*[^\]]+\]/g, "").trim()
+    : "";
+
   return (
     <section className="side-panel detail-panel animate-rise delay-100">
       <div className="flex items-start justify-between gap-3">
@@ -2688,10 +2937,21 @@ function EventDetailsPanel({
             <dd>{event.time}</dd>
           </div>
         )}
-        {event.additionalInformation && (
+        {recurrenceLabel && (
+          <div>
+            <dt className="sr-only">Recurrence</dt>
+            <dd className="flex items-center gap-2 text-sm text-[#00A19B] font-semibold">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M11 5.466V4H5a4 4 0 0 0-3.5 6.055 1 1 0 1 1-1.732 1A6 6 0 0 1 5 2h6V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384l-2.36 1.966a.25.25 0 0 1-.41-.192Zm3 5.068A6 6 0 0 1 11 14H5v1.466a.25.25 0 0 1-.41.192l-2.36-1.966a.25.25 0 0 1 0-.384l2.36-1.966a.25.25 0 0 1 .41.192V12h6a4 4 0 0 0 3.5-6.055 1 1 0 1 1 1.732-1A6 6 0 0 1 14 10.534Z"/>
+              </svg>
+              <span>Repeats: {recurrenceLabel}</span>
+            </dd>
+          </div>
+        )}
+        {cleanNotes && (
           <div>
             <dt className="sr-only">Notes</dt>
-            <dd>{event.additionalInformation}</dd>
+            <dd>{cleanNotes}</dd>
           </div>
         )}
       </dl>
@@ -2735,6 +2995,17 @@ function EventCard({
           >
             {event.status || "pending"}
           </span>
+          {event.additionalInformation?.includes("[Repeats:") && (
+            <span
+              className="text-[10px] text-[#00A19B] font-semibold flex items-center gap-1 bg-[#00A19B]/10 border border-[#00A19B]/20 px-2 py-0.5 rounded-full shrink-0"
+              title="Recurring event"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M11 5.466V4H5a4 4 0 0 0-3.5 6.055 1 1 0 1 1-1.732 1A6 6 0 0 1 5 2h6V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384l-2.36 1.966a.25.25 0 0 1-.41-.192Zm3 5.068A6 6 0 0 1 11 14H5v1.466a.25.25 0 0 1-.41.192l-2.36-1.966a.25.25 0 0 1 0-.384l2.36-1.966a.25.25 0 0 1 .41.192V12h6a4 4 0 0 0 3.5-6.055 1 1 0 1 1 1.732-1A6 6 0 0 1 14 10.534Z"/>
+              </svg>
+              <span>Repeats</span>
+            </span>
+          )}
         </div>
         
         <div className="flex items-center gap-1.5 min-w-0">
