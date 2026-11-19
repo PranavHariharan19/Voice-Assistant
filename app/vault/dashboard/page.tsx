@@ -14,6 +14,98 @@ interface VaultItem {
   created_at: string;
 }
 
+export interface VaultAttachment {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  dataUrl: string;
+}
+
+export interface DecryptedVaultData {
+  text: string;
+  category: "note" | "receipt" | "media" | "document";
+  attachments: VaultAttachment[];
+}
+
+function parseDecryptedContent(raw: string): DecryptedVaultData {
+  try {
+    const trimmed = raw.trim();
+    if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+      const parsed = JSON.parse(trimmed);
+      if (parsed.version === 2 || parsed.attachments !== undefined) {
+        return {
+          text: parsed.text || "",
+          category: parsed.category || (parsed.attachments?.length ? "receipt" : "note"),
+          attachments: Array.isArray(parsed.attachments) ? parsed.attachments : [],
+        };
+      }
+    }
+  } catch {}
+
+  return {
+    text: raw,
+    category: "note",
+    attachments: [],
+  };
+}
+
+async function fileToDataUrl(file: File): Promise<VaultAttachment> {
+  return new Promise((resolve, reject) => {
+    // If it's an image larger than 1.5MB, scale down slightly via canvas to keep uploads ultra-fast
+    if (file.type.startsWith("image/") && file.size > 1.5 * 1024 * 1024) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          let width = img.width;
+          let height = img.height;
+          const maxDim = 1920;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          ctx?.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+          resolve({
+            id: `att_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+            name: file.name,
+            type: "image/jpeg",
+            size: Math.round((dataUrl.length * 3) / 4),
+            dataUrl,
+          });
+        };
+        img.onerror = reject;
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = () => {
+        resolve({
+          id: `att_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          name: file.name,
+          type: file.type || "application/octet-stream",
+          size: file.size,
+          dataUrl: reader.result as string,
+        });
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    }
+  });
+}
+
 export default function VaultDashboard() {
   const [items, setItems] = useState<VaultItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -21,13 +113,28 @@ export default function VaultDashboard() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createFormLoading, setCreateFormLoading] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [createCategory, setCreateCategory] = useState<"note" | "receipt" | "media" | "document">("note");
+  const [createAttachments, setCreateAttachments] = useState<VaultAttachment[]>([]);
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+  const [previewMedia, setPreviewMedia] = useState<VaultAttachment | null>(null);
 
-  const [viewItem, setViewItem] = useState<{ title: string, content: string } | null>(null);
+  const [viewItem, setViewItem] = useState<{
+    id: string;
+    title: string;
+    content: string;
+    category: "note" | "receipt" | "media" | "document";
+    attachments: VaultAttachment[];
+  } | null>(null);
   
   const [passwordPromptItem, setPasswordPromptItem] = useState<{ item: VaultItem, action: "view" | "edit" } | null>(null);
   const [promptError, setPromptError] = useState<string | null>(null);
 
-  const [editItem, setEditItem] = useState<VaultItem & { decryptedContent: string, enteredPassword?: string } | null>(null);
+  const [editItem, setEditItem] = useState<VaultItem & {
+    decryptedContent: string;
+    category: "note" | "receipt" | "media" | "document";
+    attachments: VaultAttachment[];
+    enteredPassword?: string;
+  } | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
   const [editFormLoading, setEditFormLoading] = useState(false);
 
@@ -83,6 +190,33 @@ export default function VaultDashboard() {
     setLoading(false);
   }
 
+  async function handleFileUpload(files: FileList | null, isEdit = false) {
+    if (!files || files.length === 0) return;
+    setIsUploadingMedia(true);
+    try {
+      const newAttachments: VaultAttachment[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const att = await fileToDataUrl(file);
+        newAttachments.push(att);
+      }
+
+      if (isEdit && editItem) {
+        setEditItem({
+          ...editItem,
+          attachments: [...editItem.attachments, ...newAttachments],
+        });
+      } else {
+        setCreateAttachments((prev) => [...prev, ...newAttachments]);
+      }
+    } catch (err) {
+      console.error("Error reading attachment:", err);
+      alert("Failed to process attachment file.");
+    } finally {
+      setIsUploadingMedia(false);
+    }
+  }
+
   async function handleCreateSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setCreateFormLoading(true);
@@ -90,17 +224,30 @@ export default function VaultDashboard() {
 
     const formData = new FormData(e.currentTarget);
     const title = formData.get("title") as string;
-    const rawContent = formData.get("content") as string;
+    const rawContent = (formData.get("content") as string) || "";
     const password = (formData.get("locker_token") || formData.get("password") || "") as string;
 
-    if (!title || !rawContent) {
-      setCreateError("Title and content are required.");
+    if (!title) {
+      setCreateError("Title is required.");
+      setCreateFormLoading(false);
+      return;
+    }
+
+    if (!rawContent && createAttachments.length === 0) {
+      setCreateError("Please provide some notes or upload at least one attachment.");
       setCreateFormLoading(false);
       return;
     }
 
     try {
-      const encryptedContent = CryptoJS.AES.encrypt(rawContent, ENCRYPTION_KEY).toString();
+      const payload = JSON.stringify({
+        version: 2,
+        text: rawContent,
+        category: createCategory,
+        attachments: createAttachments,
+      });
+
+      const encryptedContent = CryptoJS.AES.encrypt(payload, ENCRYPTION_KEY).toString();
       const requires_item_password = !!password;
       const item_password_hash = requires_item_password ? CryptoJS.SHA256(password).toString() : null;
 
@@ -117,6 +264,8 @@ export default function VaultDashboard() {
         setCreateError(res.error);
       } else {
         setShowCreateModal(false);
+        setCreateAttachments([]);
+        setCreateCategory("note");
         loadItems(true);
       }
     } catch (err) {
@@ -141,7 +290,14 @@ export default function VaultDashboard() {
       const bytes = CryptoJS.AES.decrypt(item.content, ENCRYPTION_KEY);
       const originalText = bytes.toString(CryptoJS.enc.Utf8);
       if (!originalText) throw new Error("Decryption resulted in empty string (wrong key?)");
-      setViewItem({ title: item.title, content: originalText });
+      const parsed = parseDecryptedContent(originalText);
+      setViewItem({
+        id: item.id,
+        title: item.title,
+        content: parsed.text,
+        category: parsed.category,
+        attachments: parsed.attachments,
+      });
     } catch {
       alert("Failed to decrypt content.");
     }
@@ -152,7 +308,14 @@ export default function VaultDashboard() {
       const bytes = CryptoJS.AES.decrypt(item.content, ENCRYPTION_KEY);
       const originalText = bytes.toString(CryptoJS.enc.Utf8);
       if (!originalText) throw new Error("Decryption resulted in empty string");
-      setEditItem({ ...item, decryptedContent: originalText, enteredPassword });
+      const parsed = parseDecryptedContent(originalText);
+      setEditItem({
+        ...item,
+        decryptedContent: parsed.text,
+        category: parsed.category,
+        attachments: parsed.attachments,
+        enteredPassword,
+      });
     } catch {
       alert("Failed to decrypt content for editing.");
     }
@@ -187,17 +350,30 @@ export default function VaultDashboard() {
 
     const formData = new FormData(e.currentTarget);
     const title = formData.get("title") as string;
-    const rawContent = formData.get("content") as string;
+    const rawContent = (formData.get("content") as string) || "";
     const newPassword = (formData.get("edit_locker_token") || formData.get("password") || "") as string;
 
-    if (!title || !rawContent) {
-      setEditError("Title and content are required.");
+    if (!title) {
+      setEditError("Title is required.");
+      setEditFormLoading(false);
+      return;
+    }
+
+    if (!rawContent && editItem.attachments.length === 0) {
+      setEditError("Please provide some content or upload at least one attachment.");
       setEditFormLoading(false);
       return;
     }
 
     try {
-      const encryptedContent = CryptoJS.AES.encrypt(rawContent, ENCRYPTION_KEY).toString();
+      const payload = JSON.stringify({
+        version: 2,
+        text: rawContent,
+        category: editItem.category,
+        attachments: editItem.attachments,
+      });
+
+      const encryptedContent = CryptoJS.AES.encrypt(payload, ENCRYPTION_KEY).toString();
       const requires_item_password = !!newPassword;
       const item_password_hash = requires_item_password ? CryptoJS.SHA256(newPassword).toString() : null;
 
@@ -219,7 +395,7 @@ export default function VaultDashboard() {
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
-      setEditError(errorMessage || "Encryption failed");
+      setEditError(errorMessage || "Update failed");
     } finally {
       setEditFormLoading(false);
     }
@@ -487,7 +663,14 @@ export default function VaultDashboard() {
                     </div>
                   )}
 
-                <h2 className="text-xl font-bold text-[#17211F] mt-4 line-clamp-2">{item.title}</h2>
+                <div>
+                  <h2 className="text-xl font-bold text-[#17211F] mt-4 line-clamp-2">{item.title}</h2>
+                  <div className="flex items-center gap-1.5 mt-2">
+                    <span className="text-[10px] font-bold text-[#00A19B] bg-[#00A19B]/10 px-2 py-0.5 rounded-full">
+                      {item.requires_item_password ? "🔒 Protected" : "📁 Encrypted"}
+                    </span>
+                  </div>
+                </div>
                 <div className="text-right text-xs font-bold text-[#17211F]/40 mt-auto">
                   {new Date(item.created_at).toLocaleDateString()} {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </div>
@@ -540,22 +723,136 @@ export default function VaultDashboard() {
       {/* Create Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-8 w-full max-w-lg shadow-2xl">
-            <h2 className="text-2xl font-bold text-[#17211F] mb-6">Create New Locker</h2>
+          <div className="bg-white rounded-3xl p-6 sm:p-8 w-full max-w-lg shadow-2xl max-h-[92vh] overflow-y-auto">
+            <h2 className="text-2xl font-bold text-[#17211F] mb-4">Create New Locker</h2>
+            
+            {/* Category Selector */}
+            <div className="mb-4">
+              <label className="text-xs font-bold text-[#17211F]/60 uppercase ml-1 block mb-2">Category</label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {[
+                  { id: "note", label: "Note", icon: "📝" },
+                  { id: "receipt", label: "Receipt", icon: "🧾" },
+                  { id: "media", label: "Media", icon: "🖼️" },
+                  { id: "document", label: "Document", icon: "📄" },
+                ].map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setCreateCategory(cat.id as any)}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                      createCategory === cat.id
+                        ? "bg-[#00A19B] text-white shadow-md shadow-[#00A19B]/20"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    }`}
+                  >
+                    <span>{cat.icon}</span>
+                    <span>{cat.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <form onSubmit={handleCreateSubmit} className="space-y-4" autoComplete="off">
-              {/* Decoy hidden inputs to prevent Chrome autofill heuristics from attaching to the real input */}
+              {/* Decoy hidden inputs to prevent Chrome autofill heuristics */}
               <div style={{ position: "absolute", left: "-9999px", opacity: 0, height: 0, width: 0, overflow: "hidden" }} aria-hidden="true">
                 <input type="text" name="fake_user" tabIndex={-1} autoComplete="off" />
                 <input type="password" name="fake_pass" tabIndex={-1} autoComplete="off" />
               </div>
+              
               <div>
                 <label className="text-xs font-bold text-[#17211F]/60 uppercase ml-1">Title</label>
-                <input required name="title" autoComplete="off" className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#00A19B]/50" />
+                <input
+                  required
+                  name="title"
+                  placeholder={createCategory === "receipt" ? "e.g. Apple Store Receipt, Grocery" : createCategory === "media" ? "e.g. ID Card Photo, Vacation Scan" : "Title of your locker"}
+                  autoComplete="off"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#00A19B]/50"
+                />
               </div>
+
+              {/* Attachments Upload Zone */}
               <div>
-                <label className="text-xs font-bold text-[#17211F]/60 uppercase ml-1">Content to Encrypt</label>
-                <textarea required name="content" rows={4} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#00A19B]/50" />
+                <label className="text-xs font-bold text-[#17211F]/60 uppercase ml-1 block mb-1.5">
+                  {createCategory === "receipt" ? "Receipt Images / PDFs" : createCategory === "media" ? "Photos & Images" : "Attachments (Optional)"}
+                </label>
+                <div className="border-2 border-dashed border-gray-200 hover:border-[#00A19B]/50 rounded-2xl p-4 text-center bg-gray-50/60 hover:bg-[#00A19B]/5 transition-colors relative cursor-pointer group">
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*,application/pdf"
+                    onChange={(e) => handleFileUpload(e.target.files, false)}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                  <div className="flex flex-col items-center justify-center gap-1.5 py-1 pointer-events-none">
+                    <div className="w-10 h-10 rounded-full bg-[#00A19B]/10 text-[#00A19B] flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                        <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z"/>
+                      </svg>
+                    </div>
+                    <p className="text-xs font-semibold text-gray-700">
+                      {isUploadingMedia ? "Processing file..." : "Click or drag receipts, images, or PDFs"}
+                    </p>
+                    <p className="text-[11px] text-gray-400">Stored with client-side AES encryption</p>
+                  </div>
+                </div>
+
+                {/* Attached Previews */}
+                {createAttachments.length > 0 && (
+                  <div className="mt-3 grid grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1">
+                    {createAttachments.map((att) => (
+                      <div
+                        key={att.id}
+                        className="relative flex items-center gap-2 p-2 bg-gray-50 border border-gray-200 rounded-xl"
+                      >
+                        {att.type.startsWith("image/") ? (
+                          <img
+                            src={att.dataUrl}
+                            alt={att.name}
+                            className="w-10 h-10 object-cover rounded-lg shrink-0 border border-gray-200"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-lg bg-red-100 text-red-600 flex items-center justify-center text-xs font-bold shrink-0">
+                            PDF
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-gray-800 truncate">{att.name}</p>
+                          <p className="text-[10px] text-gray-400 font-medium">
+                            {Math.round(att.size / 1024)} KB
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setCreateAttachments((prev) => prev.filter((a) => a.id !== att.id))
+                          }
+                          className="text-gray-400 hover:text-red-500 p-1 rounded-md transition-colors"
+                          title="Remove file"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
+
+              <div>
+                <label className="text-xs font-bold text-[#17211F]/60 uppercase ml-1">
+                  {createCategory === "receipt" ? "Receipt Notes / Details" : "Content / Notes"}
+                </label>
+                <textarea
+                  name="content"
+                  rows={3}
+                  placeholder={createCategory === "receipt" ? "Total amount, purchase date, store name, or warranty notes..." : "Enter details or secret notes..."}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#00A19B]/50"
+                />
+              </div>
+
               <div>
                 <label className="text-xs font-bold text-[#17211F]/60 uppercase ml-1">Password (Optional)</label>
                 <div className="relative">
@@ -589,9 +886,24 @@ export default function VaultDashboard() {
                 </div>
               </div>
               {createError && <p className="text-red-500 text-sm font-bold text-center">{createError}</p>}
-              <div className="flex gap-3 pt-4">
-                <button type="button" onClick={() => setShowCreateModal(false)} className="flex-1 py-3 font-bold text-[#17211F]/60 hover:bg-gray-100 rounded-xl transition">Cancel</button>
-                <button disabled={createFormLoading} type="submit" className="flex-1 bg-[#00A19B] text-white font-bold py-3 rounded-xl shadow-[0_8px_20px_rgba(0,161,155,0.28)] hover:-translate-y-0.5 transition disabled:opacity-50">Create</button>
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    setCreateAttachments([]);
+                  }}
+                  className="flex-1 py-3 font-bold text-[#17211F]/60 hover:bg-gray-100 rounded-xl transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  disabled={createFormLoading || isUploadingMedia}
+                  type="submit"
+                  className="flex-1 bg-[#00A19B] text-white font-bold py-3 rounded-xl shadow-[0_8px_20px_rgba(0,161,155,0.28)] hover:-translate-y-0.5 transition disabled:opacity-50 cursor-pointer"
+                >
+                  {createFormLoading ? "Encrypting..." : "Create"}
+                </button>
               </div>
             </form>
           </div>
@@ -600,14 +912,101 @@ export default function VaultDashboard() {
 
       {/* View Item Modal */}
       {viewItem && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-8 w-full max-w-lg shadow-2xl relative">
-            <button onClick={() => setViewItem(null)} className="absolute top-4 right-4 text-gray-400 hover:text-black">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg>
-            </button>
-            <h2 className="text-2xl font-bold text-[#17211F] mb-6 pr-8">{viewItem.title}</h2>
-            <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-800 whitespace-pre-wrap max-h-96 overflow-y-auto border border-gray-200">
-              {viewItem.content}
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 w-full max-w-xl max-h-[90vh] shadow-2xl relative flex flex-col">
+            <div className="flex items-start justify-between gap-4 mb-4 pr-8">
+              <div>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="text-xs font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-[#00A19B]/10 text-[#00A19B]">
+                    {viewItem.category === "receipt" ? "🧾 Receipt" : viewItem.category === "media" ? "🖼️ Media" : viewItem.category === "document" ? "📄 Document" : "📝 Note"}
+                  </span>
+                  {viewItem.attachments.length > 0 && (
+                    <span className="text-xs text-gray-400 font-medium">
+                      {viewItem.attachments.length} attachment{viewItem.attachments.length !== 1 ? "s" : ""}
+                    </span>
+                  )}
+                </div>
+                <h2 className="text-2xl font-bold text-[#17211F]">{viewItem.title}</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewItem(null)}
+                className="absolute top-5 right-5 text-gray-400 hover:text-black p-1 rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
+                aria-label="Close"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" viewBox="0 0 16 16"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg>
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+              {viewItem.content && (
+                <div className="bg-gray-50 rounded-2xl p-4 text-sm text-gray-800 whitespace-pre-wrap border border-gray-200">
+                  {viewItem.content}
+                </div>
+              )}
+
+              {/* Attachments Section */}
+              {viewItem.attachments.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">
+                    Attached Media & Receipts
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {viewItem.attachments.map((att) => (
+                      <div
+                        key={att.id}
+                        className="bg-gray-50 rounded-2xl p-3 border border-gray-200 flex flex-col justify-between group hover:border-[#00A19B]/40 transition-all"
+                      >
+                        {att.type.startsWith("image/") ? (
+                          <div
+                            onClick={() => setPreviewMedia(att)}
+                            className="relative h-36 w-full rounded-xl overflow-hidden bg-gray-200 cursor-pointer group mb-2"
+                          >
+                            <img
+                              src={att.dataUrl}
+                              alt={att.name}
+                              className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                            />
+                            <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1">
+                              <span>🔍 View Full</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="h-28 w-full rounded-xl bg-red-50 text-red-600 flex flex-col items-center justify-center gap-1.5 mb-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" viewBox="0 0 16 16">
+                              <path d="M14 14V4.5L9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2zM9.5 1.5 13 5h-3.5V1.5zM4.5 9h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1 0-1zm0 2h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1 0-1z"/>
+                            </svg>
+                            <span className="text-xs font-bold uppercase tracking-wider">PDF Document</span>
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between gap-2 mt-1">
+                          <div className="truncate">
+                            <p className="text-xs font-bold text-gray-800 truncate" title={att.name}>
+                              {att.name}
+                            </p>
+                            <p className="text-[10px] text-gray-400 font-medium">
+                              {Math.round(att.size / 1024)} KB
+                            </p>
+                          </div>
+
+                          <a
+                            href={att.dataUrl}
+                            download={att.name}
+                            className="px-2.5 py-1 rounded-lg bg-white border border-gray-200 hover:border-[#00A19B] text-gray-700 hover:text-[#00A19B] text-xs font-semibold flex items-center gap-1 shadow-sm transition-colors shrink-0"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
+                              <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                              <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+                            </svg>
+                            Save
+                          </a>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -675,22 +1074,126 @@ export default function VaultDashboard() {
       {/* Edit Locker Modal */}
       {editItem && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-8 w-full max-w-lg shadow-2xl relative">
-            <h2 className="text-2xl font-bold text-[#17211F] mb-6">Edit Locker</h2>
+          <div className="bg-white rounded-3xl p-6 sm:p-8 w-full max-w-lg shadow-2xl relative max-h-[92vh] overflow-y-auto">
+            <h2 className="text-2xl font-bold text-[#17211F] mb-4">Edit Locker</h2>
+
+            {/* Category Selector */}
+            <div className="mb-4">
+              <label className="text-xs font-bold text-[#17211F]/60 uppercase ml-1 block mb-2">Category</label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {[
+                  { id: "note", label: "Note", icon: "📝" },
+                  { id: "receipt", label: "Receipt", icon: "🧾" },
+                  { id: "media", label: "Media", icon: "🖼️" },
+                  { id: "document", label: "Document", icon: "📄" },
+                ].map((cat) => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setEditItem({ ...editItem, category: cat.id as any })}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                      editItem.category === cat.id
+                        ? "bg-[#00A19B] text-white shadow-md shadow-[#00A19B]/20"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    }`}
+                  >
+                    <span>{cat.icon}</span>
+                    <span>{cat.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <form onSubmit={handleEditSubmit} className="space-y-4" autoComplete="off">
-              {/* Decoy hidden inputs to prevent Chrome autofill heuristics from attaching to the real input */}
+              {/* Decoy hidden inputs to prevent Chrome autofill heuristics */}
               <div style={{ position: "absolute", left: "-9999px", opacity: 0, height: 0, width: 0, overflow: "hidden" }} aria-hidden="true">
                 <input type="text" name="fake_user" tabIndex={-1} autoComplete="off" />
                 <input type="password" name="fake_pass" tabIndex={-1} autoComplete="off" />
               </div>
+
               <div>
                 <label className="text-xs font-bold text-[#17211F]/60 uppercase ml-1">Title</label>
                 <input required defaultValue={editItem.title} name="title" autoComplete="off" className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#00A19B]/50" />
               </div>
+
+              {/* Attachments Section */}
               <div>
-                <label className="text-xs font-bold text-[#17211F]/60 uppercase ml-1">Content</label>
-                <textarea required defaultValue={editItem.decryptedContent} name="content" rows={4} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#00A19B]/50" />
+                <label className="text-xs font-bold text-[#17211F]/60 uppercase ml-1 block mb-1.5">
+                  Attachments & Receipts
+                </label>
+                <div className="border-2 border-dashed border-gray-200 hover:border-[#00A19B]/50 rounded-2xl p-4 text-center bg-gray-50/60 hover:bg-[#00A19B]/5 transition-colors relative cursor-pointer group">
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*,application/pdf"
+                    onChange={(e) => handleFileUpload(e.target.files, true)}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                  <div className="flex flex-col items-center justify-center gap-1.5 py-1 pointer-events-none">
+                    <div className="w-10 h-10 rounded-full bg-[#00A19B]/10 text-[#00A19B] flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                        <path d="M7.646 1.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 2.707V11.5a.5.5 0 0 1-1 0V2.707L5.354 4.854a.5.5 0 1 1-.708-.708l3-3z"/>
+                      </svg>
+                    </div>
+                    <p className="text-xs font-semibold text-gray-700">
+                      {isUploadingMedia ? "Processing file..." : "Click or drag to add more attachments"}
+                    </p>
+                    <p className="text-[11px] text-gray-400">JPG, PNG, WebP, PDF</p>
+                  </div>
+                </div>
+
+                {/* Existing attachments */}
+                {editItem.attachments.length > 0 && (
+                  <div className="mt-3 grid grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1">
+                    {editItem.attachments.map((att) => (
+                      <div
+                        key={att.id}
+                        className="relative flex items-center gap-2 p-2 bg-gray-50 border border-gray-200 rounded-xl"
+                      >
+                        {att.type.startsWith("image/") ? (
+                          <img
+                            src={att.dataUrl}
+                            alt={att.name}
+                            className="w-10 h-10 object-cover rounded-lg shrink-0 border border-gray-200"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-lg bg-red-100 text-red-600 flex items-center justify-center text-xs font-bold shrink-0">
+                            PDF
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-gray-800 truncate">{att.name}</p>
+                          <p className="text-[10px] text-gray-400 font-medium">
+                            {Math.round(att.size / 1024)} KB
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setEditItem({
+                              ...editItem,
+                              attachments: editItem.attachments.filter((a) => a.id !== att.id),
+                            })
+                          }
+                          className="text-gray-400 hover:text-red-500 p-1 rounded-md transition-colors"
+                          title="Remove file"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
+
+              <div>
+                <label className="text-xs font-bold text-[#17211F]/60 uppercase ml-1">Content / Notes</label>
+                <textarea defaultValue={editItem.decryptedContent} name="content" rows={3} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#00A19B]/50" />
+              </div>
+
               <div>
                 <label className="text-xs font-bold text-[#17211F]/60 uppercase ml-1">Password</label>
                 <div className="relative">
@@ -725,9 +1228,9 @@ export default function VaultDashboard() {
                 </div>
               </div>
               {editError && <p className="text-red-500 text-sm font-bold text-center">{editError}</p>}
-              <div className="flex gap-3 pt-4">
-                <button type="button" onClick={() => setEditItem(null)} className="flex-1 py-3 font-bold text-[#17211F]/60 hover:bg-gray-100 rounded-xl transition">Cancel</button>
-                <button disabled={editFormLoading} type="submit" className="flex-1 bg-[#00A19B] text-white font-bold py-3 rounded-xl shadow-[0_8px_20px_rgba(0,161,155,0.28)] hover:-translate-y-0.5 transition disabled:opacity-50">Save Changes</button>
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setEditItem(null)} className="flex-1 py-3 font-bold text-[#17211F]/60 hover:bg-gray-100 rounded-xl transition cursor-pointer">Cancel</button>
+                <button disabled={editFormLoading || isUploadingMedia} type="submit" className="flex-1 bg-[#00A19B] text-white font-bold py-3 rounded-xl shadow-[0_8px_20px_rgba(0,161,155,0.28)] hover:-translate-y-0.5 transition disabled:opacity-50 cursor-pointer">Save Changes</button>
               </div>
             </form>
           </div>
@@ -780,6 +1283,48 @@ export default function VaultDashboard() {
               ))}
             </ul>
             <button onClick={() => setRestoreErrors([])} className="w-full mt-6 bg-[#17211F] text-white font-bold py-3 rounded-xl hover:-translate-y-0.5 transition">Dismiss</button>
+          </div>
+        </div>
+      )}
+
+      {/* Media Lightbox Modal */}
+      {previewMedia && (
+        <div
+          onClick={() => setPreviewMedia(null)}
+          className="fixed inset-0 bg-black/90 backdrop-blur-md z-[60] flex flex-col items-center justify-center p-4 cursor-pointer"
+        >
+          <div className="absolute top-5 right-5 flex items-center gap-3 z-10">
+            <a
+              href={previewMedia.dataUrl}
+              download={previewMedia.name}
+              onClick={(e) => e.stopPropagation()}
+              className="px-4 py-2 rounded-xl bg-white/20 hover:bg-white/30 text-white text-xs font-bold flex items-center gap-2 backdrop-blur-sm transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+              </svg>
+              Download File
+            </a>
+            <button
+              type="button"
+              onClick={() => setPreviewMedia(null)}
+              className="h-9 w-9 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center transition-colors cursor-pointer"
+              aria-label="Close Preview"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg>
+            </button>
+          </div>
+
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="max-w-4xl max-h-[85vh] flex items-center justify-center p-2 cursor-default"
+          >
+            <img
+              src={previewMedia.dataUrl}
+              alt={previewMedia.name}
+              className="max-w-full max-h-[80vh] object-contain rounded-2xl shadow-2xl"
+            />
           </div>
         </div>
       )}
