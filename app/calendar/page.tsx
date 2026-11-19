@@ -199,6 +199,16 @@ function groupEvents(events: CalendarEvent[]) {
 
 type RoutineTask = { id: string; text: string; time?: string; completed?: boolean; lastCompletedDate?: string };
 
+function mapDbTaskToRoutineTask(row: { id: string | number; text: string; time?: string | null; completed?: boolean | null; last_completed_date?: string | null }): RoutineTask {
+  return {
+    id: String(row.id),
+    text: row.text,
+    time: row.time || undefined,
+    completed: !!row.completed,
+    lastCompletedDate: row.last_completed_date || undefined,
+  };
+}
+
 function SortableRoutineItem({
   task,
   onToggle,
@@ -360,60 +370,183 @@ export default function Home() {
     })
   );
 
-  const handleRoutineDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (over && active.id !== over.id) {
-      const oldIndex = routineTasks.findIndex((t) => t.id === active.id);
-      const newIndex = routineTasks.findIndex((t) => t.id === over.id);
-      if (oldIndex !== -1 && newIndex !== -1) {
-        const reordered = arrayMove(routineTasks, oldIndex, newIndex);
-        saveRoutineTasks(reordered);
-      }
-    }
-  };
   const [routineTasks, setRoutineTasks] = useState<RoutineTask[]>([]);
   const [newTaskText, setNewTaskText] = useState("");
   const [newTaskTime, setNewTaskTime] = useState("");
 
   const ROUTINE_STORAGE_KEY = "daily_routine_tasks";
 
-  useEffect(() => {
-    try {
-      const key = user ? `${ROUTINE_STORAGE_KEY}_${user.id}` : ROUTINE_STORAGE_KEY;
-      const stored = localStorage.getItem(key);
-      if (stored) {
-        const parsed: RoutineTask[] = JSON.parse(stored);
-        const todayKey = dateKey(new Date());
-        let hasReset = false;
-        const updated = parsed.map((t) => {
-          if (t.completed && t.lastCompletedDate && t.lastCompletedDate !== todayKey) {
-            hasReset = true;
-            return { ...t, completed: false, lastCompletedDate: undefined };
-          }
-          return t;
-        });
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setRoutineTasks(updated);
-        if (hasReset) {
-          localStorage.setItem(key, JSON.stringify(updated));
-        }
-      }
-    } catch (err) {
-      console.error("Failed to load routine tasks from localStorage:", err);
-    }
-  }, [user]);
-
-  const saveRoutineTasks = (tasks: RoutineTask[]) => {
-    setRoutineTasks(tasks);
+  const saveToLocalStorage = (tasks: RoutineTask[]) => {
     try {
       const key = user ? `${ROUTINE_STORAGE_KEY}_${user.id}` : ROUTINE_STORAGE_KEY;
       localStorage.setItem(key, JSON.stringify(tasks));
     } catch (err) {
-      console.error("Failed to save routine tasks to localStorage:", err);
+      console.error("Failed to save routine tasks to localStorage fallback:", err);
     }
   };
 
-  const handleAddRoutineTask = (e?: FormEvent) => {
+  useEffect(() => {
+    let isMounted = true;
+    const todayKey = dateKey(new Date());
+
+    async function loadRoutineTasks() {
+      const key = user ? `${ROUTINE_STORAGE_KEY}_${user.id}` : ROUTINE_STORAGE_KEY;
+
+      // Read local storage tasks for migration / fallback
+      let localTasks: RoutineTask[] = [];
+      try {
+        const stored = localStorage.getItem(key) || localStorage.getItem(ROUTINE_STORAGE_KEY);
+        if (stored) {
+          localTasks = JSON.parse(stored);
+        }
+      } catch (err) {
+        console.error("Failed to parse localStorage routine tasks:", err);
+      }
+
+      if (!user) {
+        // Logged out: use localStorage only with daily reset
+        const updated = localTasks.map((t) => {
+          if (t.completed && t.lastCompletedDate && t.lastCompletedDate !== todayKey) {
+            return { ...t, completed: false, lastCompletedDate: undefined };
+          }
+          return t;
+        });
+        if (isMounted) setRoutineTasks(updated);
+        return;
+      }
+
+      // Logged in: fetch from Supabase
+      try {
+        const { data: dbData, error } = await supabase
+          .from("routine_tasks")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("position", { ascending: true });
+
+        if (!isMounted) return;
+
+        if (error) {
+          console.warn("Could not query routine_tasks from Supabase (falling back to local cache):", error.message);
+          const updated = localTasks.map((t) => {
+            if (t.completed && t.lastCompletedDate && t.lastCompletedDate !== todayKey) {
+              return { ...t, completed: false, lastCompletedDate: undefined };
+            }
+            return t;
+          });
+          setRoutineTasks(updated);
+          return;
+        }
+
+        // Automatic one-time migration: If DB has no tasks but localStorage does, upload them to Supabase
+        if ((!dbData || dbData.length === 0) && localTasks.length > 0) {
+          const toInsert = localTasks.map((t, idx) => ({
+            id: t.id || `routine_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+            user_id: user.id,
+            text: t.text,
+            time: t.time || null,
+            completed: !!t.completed && t.lastCompletedDate === todayKey,
+            last_completed_date: t.completed && t.lastCompletedDate === todayKey ? todayKey : null,
+            position: idx,
+          }));
+
+          const { data: inserted, error: insertErr } = await supabase
+            .from("routine_tasks")
+            .insert(toInsert)
+            .select("*")
+            .order("position", { ascending: true });
+
+          if (!insertErr && inserted && isMounted) {
+            setRoutineTasks(inserted.map(mapDbTaskToRoutineTask));
+            try {
+              localStorage.removeItem(key);
+              localStorage.removeItem(ROUTINE_STORAGE_KEY);
+            } catch {}
+            return;
+          }
+        }
+
+        // DB has tasks: perform daily reset check
+        const resetIds: string[] = [];
+        const mapped = (dbData || []).map((row) => {
+          const isCompleted = !!row.completed;
+          const lastDate = row.last_completed_date || undefined;
+          if (isCompleted && lastDate && lastDate !== todayKey) {
+            resetIds.push(row.id);
+            return {
+              id: String(row.id),
+              text: row.text,
+              time: row.time || undefined,
+              completed: false,
+              lastCompletedDate: undefined,
+            };
+          }
+          return {
+            id: String(row.id),
+            text: row.text,
+            time: row.time || undefined,
+            completed: isCompleted,
+            lastCompletedDate: lastDate,
+          };
+        });
+
+        if (isMounted) setRoutineTasks(mapped);
+
+        // Batch update tasks that auto-reset today
+        if (resetIds.length > 0) {
+          await supabase
+            .from("routine_tasks")
+            .update({ completed: false, last_completed_date: null, updated_at: new Date().toISOString() })
+            .in("id", resetIds)
+            .eq("user_id", user.id);
+        }
+
+        // Cleanup obsolete localStorage copy now that DB is active
+        try {
+          localStorage.removeItem(key);
+          localStorage.removeItem(ROUTINE_STORAGE_KEY);
+        } catch {}
+      } catch (err) {
+        console.error("Error loading routine tasks:", err);
+      }
+    }
+
+    loadRoutineTasks();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
+
+  const handleRoutineDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      const oldIndex = routineTasks.findIndex((t) => t.id === active.id);
+      const newIndex = routineTasks.findIndex((t) => t.id === over.id);
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const reordered = arrayMove(routineTasks, oldIndex, newIndex);
+        setRoutineTasks(reordered);
+        saveToLocalStorage(reordered);
+
+        if (user) {
+          try {
+            await Promise.all(
+              reordered.map((task, index) =>
+                supabase
+                  .from("routine_tasks")
+                  .update({ position: index, updated_at: new Date().toISOString() })
+                  .eq("id", task.id)
+                  .eq("user_id", user.id)
+              )
+            );
+          } catch (err) {
+            console.error("Error updating routine task positions in Supabase:", err);
+          }
+        }
+      }
+    }
+  };
+
+  const handleAddRoutineTask = async (e?: FormEvent) => {
     if (e) e.preventDefault();
     if (!newTaskText.trim()) return;
     const newTask: RoutineTask = {
@@ -422,31 +555,91 @@ export default function Home() {
       time: newTaskTime.trim() || undefined,
       completed: false,
     };
-    const updated = [...routineTasks, newTask];
-    saveRoutineTasks(updated);
+    const nextList = [...routineTasks, newTask];
+    setRoutineTasks(nextList);
+    saveToLocalStorage(nextList);
     setNewTaskText("");
     setNewTaskTime("");
+
+    if (user) {
+      try {
+        const { error } = await supabase.from("routine_tasks").insert([
+          {
+            id: newTask.id,
+            user_id: user.id,
+            text: newTask.text,
+            time: newTask.time || null,
+            completed: false,
+            last_completed_date: null,
+            position: routineTasks.length,
+          },
+        ]);
+        if (error) {
+          console.error("Failed to insert routine task into Supabase:", error.message);
+        }
+      } catch (err) {
+        console.error("Error inserting routine task:", err);
+      }
+    }
   };
 
-  const handleRemoveRoutineTask = (id: string) => {
-    const updated = routineTasks.filter((t) => t.id !== id);
-    saveRoutineTasks(updated);
+  const handleRemoveRoutineTask = async (id: string) => {
+    const nextList = routineTasks.filter((t) => t.id !== id);
+    setRoutineTasks(nextList);
+    saveToLocalStorage(nextList);
+
+    if (user) {
+      try {
+        const { error } = await supabase
+          .from("routine_tasks")
+          .delete()
+          .eq("id", id)
+          .eq("user_id", user.id);
+        if (error) {
+          console.error("Failed to delete routine task from Supabase:", error.message);
+        }
+      } catch (err) {
+        console.error("Error deleting routine task:", err);
+      }
+    }
   };
 
-  const handleToggleRoutineTask = (id: string) => {
+  const handleToggleRoutineTask = async (id: string) => {
     const todayKey = dateKey(new Date());
-    const updated = routineTasks.map((t) => {
+    let targetTask: RoutineTask | null = null;
+    const nextList = routineTasks.map((t) => {
       if (t.id === id) {
         const nextCompleted = !t.completed;
-        return {
+        targetTask = {
           ...t,
           completed: nextCompleted,
           lastCompletedDate: nextCompleted ? todayKey : undefined,
         };
+        return targetTask;
       }
       return t;
     });
-    saveRoutineTasks(updated);
+    setRoutineTasks(nextList);
+    saveToLocalStorage(nextList);
+
+    if (user && targetTask) {
+      try {
+        const { error } = await supabase
+          .from("routine_tasks")
+          .update({
+            completed: (targetTask as RoutineTask).completed,
+            last_completed_date: (targetTask as RoutineTask).lastCompletedDate || null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", id)
+          .eq("user_id", user.id);
+        if (error) {
+          console.error("Failed to update routine task status in Supabase:", error.message);
+        }
+      } catch (err) {
+        console.error("Error toggling routine task status:", err);
+      }
+    }
   };
 
   useEffect(() => {
