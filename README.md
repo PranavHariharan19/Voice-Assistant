@@ -12,8 +12,10 @@ Traditional productivity apps are fragmented. Calendars require manual clicking,
 
 I wanted to consolidate everything into a single, cohesive dashboard with a **voice-first interface**:
 - Speak commands directly to schedule, reschedule, or find events.
-- Track daily routines that auto-reset every day.
-- Access secure document vaults and sports fixtures instantly.
+- Schedule flexible recurring events with custom intervals like "Every 2 days once".
+- Track daily routines that sync across mobile and desktop and auto-reset every day.
+- Store sensitive documents, receipts, and media inside an encrypted vault.
+- Follow sports fixtures and pin real-time live scores across the entire app.
 
 ---
 
@@ -26,37 +28,44 @@ Powered by the **Gemini API**, the embedded assistant processes spoken or typed 
 - **Smart Queries**: *"Find all my dentist appointments from this month."*
 - **Voice Feedback**: Spoken audio confirmation for all assistant actions.
 
-### 📅 Interactive Calendar & Event Management
+### 📅 Interactive Calendar & Recurring Events
 - **Full Calendar Views**: Month and year navigation with quick Jump-to-Today controls.
+- **Recurring Events Engine**: Support for recurring schedules with *Daily*, *Weekly*, *Monthly*, *Annually*, and *Custom* frequencies (e.g., *"Every 2 days once"*, *"Every 3 weeks"*, *"Every other day"*).
+- **Recurrence Badges & Details**: Dedicated recurrence tags on event cards and clean recurrence breakdowns in event details.
 - **Category Filtering**: Instant filtering for *Quiz*, *Assignment*, and *Other* events.
 - **Drag-and-Drop Rescheduling**: Drag any event chip directly onto a new date.
 - **Today's Overview**: Dedicated card showing today's events at a glance.
 
-### 📝 Persistent Daily Routine Tracker
-- **Recurring Activities**: Checklist for daily activities independent of calendar dates.
+### 📝 Cloud-Synced Daily Routine Tracker
+- **Recurring Activities**: Checklist for daily habits and tasks independent of calendar dates.
+- **Cross-Device Database Sync**: Fully backed by Supabase with Row Level Security (RLS)—synced seamlessly across mobile and PC.
 - **Time Pickers**: Add optional times for routine tasks.
-- **Automatic Daily Reset**: Tasks checked off today automatically reset to unticked the next day.
-- **User Persistence**: Synced in local storage per logged-in user.
+- **Automatic Daily Reset**: Tasks completed today automatically reset to unticked the next day based on completion timestamps.
+
+### 🛡️ Encrypted Vault & Media Storage
+- **Client-Side AES Encryption**: Zero-knowledge encryption for personal lockers, notes, and records.
+- **Media & Receipt Attachments**: Securely attach photos, receipts, and files directly to encrypted lockers.
+- **Categorization & Search**: Filter and retrieve files and notes instantly.
+
+### 🏆 Sports Fixture Tracker & Live Score Pinning
+- **Live Match Schedules**: Real-time schedules for **Cricket** (India Men's/Women's, ICC events), **Formula 1**, **Football**, **Kabaddi**, and more.
+- **Live Score Pinning**: Pin active matches from the Sports page to a floating live score pill that stays updated across all dashboard pages.
 
 ### 🗂️ Features Hub & Navigation
 - **Quick Action Cards**: Dedicated hub in the sidebar for instant access to *Routine*, *Vault*, and *Sports*.
 - **Seamless Panel Switching**: Clean embedded panel views with 1-click close buttons.
-
-### 🛡️ Secure Document Vault
-- **Private Vault**: Cloud document storage for PDFs, images, and notes.
-- **Categorization & Search**: Filter and retrieve files instantly.
-
-### 🏆 Sports Fixture Tracker
-- Real-time match schedules for **Cricket** (India Men's/Women's, ICC events), **Formula 1**, **Football**,**Kabaddi**, and more.
+- **PWA Ready**: Installable on PC and mobile with offline caching and background service worker sync.
 
 ---
 
 ## 🛠️ Tech Stack
 
 - **Framework**: Next.js (App Router, TypeScript)
-- **Styling**: Vanilla CSS (Tailwind utilities, glassmorphism design system, dark/warm color palette)
+- **Styling**: Tailwind CSS & Vanilla CSS (glassmorphism design system, dark/warm color palette)
 - **Database & Auth**: Supabase (PostgreSQL, Row Level Security, Auth)
 - **AI & Speech**: Google Gemini API & Web Speech API
+- **Security**: Web Crypto API (Client-side AES encryption)
+- **Live Data**: ESPN Cricinfo API & Live Sports Scraping
 
 ---
 
