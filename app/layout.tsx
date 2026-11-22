@@ -4,7 +4,7 @@ import { AuthProvider } from "@/lib/auth-context";
 import LiveScoreWidget from "@/components/live-score-widget";
 
 export const metadata: Metadata = {
-  title: "Tony - Personal Assistant",
+  title: "Tony",
   description: "Your AI-powered personal assistant, dynamic calendar, sports schedule tracker, and secure vault.",
   manifest: "/manifest.json",
   icons: {

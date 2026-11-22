@@ -1,5 +1,5 @@
 {
-  "name": "Tony - Personal Assistant",
+  "name": "Tony",
   "short_name": "Tony",
   "description": "Your AI-powered personal assistant, dynamic calendar, sports schedule tracker, and secure vault.",
   "start_url": "/calendar",
