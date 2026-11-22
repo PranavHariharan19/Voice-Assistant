@@ -4,18 +4,28 @@ import { AuthProvider } from "@/lib/auth-context";
 import LiveScoreWidget from "@/components/live-score-widget";
 
 export const metadata: Metadata = {
-  title: "Mint Assistant & Calendar",
+  title: "Tony - Personal Assistant",
   description: "Your AI-powered personal assistant, dynamic calendar, sports schedule tracker, and secure vault.",
   manifest: "/manifest.json",
+  icons: {
+    icon: [
+      { url: "/favicon.png", sizes: "48x48", type: "image/png" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
-    title: "Mint Assistant",
+    statusBarStyle: "black-translucent",
+    title: "Tony",
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#00A19B",
+  themeColor: "#0E1116",
 };
 
 export default function RootLayout({
