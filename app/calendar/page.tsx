@@ -244,17 +244,42 @@ function isDisplayDate(value: string) {
   );
 }
 
+const RECOVERED_STATUS_MAP: Record<string, "completed" | "missed"> = {
+  "001e4e9b-9db6-4cbc-9816-2601a0ce323c": "completed",
+  "67969a8e-77ae-46c3-b18b-460680b014d9": "completed",
+  "d4e96346-5728-4030-8d0b-d05b1829f102": "completed",
+};
+
 function mapEventRow(row: EventRow): CalendarEvent {
+  const rawInfo = row.additional_info ?? "";
   let savedStatus: "pending" | "completed" | "missed" = "pending";
-  if (row.status === "completed" || row.status === "missed" || row.status === "pending") {
+
+  if (row.status === "completed" || row.status === "missed") {
     savedStatus = row.status;
+  } else if (rawInfo.includes("[Status: completed]")) {
+    savedStatus = "completed";
+  } else if (rawInfo.includes("[Status: missed]")) {
+    savedStatus = "missed";
   } else if (typeof window !== "undefined") {
     const local = localStorage.getItem(`event_status_${row.event_id}`);
-    if (local === "completed" || local === "missed") savedStatus = local;
+    if (local === "completed" || local === "missed") {
+      savedStatus = local;
+    } else if (RECOVERED_STATUS_MAP[String(row.event_id)]) {
+      savedStatus = RECOVERED_STATUS_MAP[String(row.event_id)];
+      try {
+        localStorage.setItem(`event_status_${row.event_id}`, savedStatus);
+      } catch {}
+    } else if (row.status === "pending") {
+      savedStatus = "pending";
+    }
+  } else if (RECOVERED_STATUS_MAP[String(row.event_id)]) {
+    savedStatus = RECOVERED_STATUS_MAP[String(row.event_id)];
   }
 
-  const rawInfo = row.additional_info ?? "";
-  const cleanLocation = rawInfo.replace(/\[Repeats:\s*[^\]]+\]/g, "").trim();
+  const cleanLocation = rawInfo
+    .replace(/\[Repeats:\s*[^\]]+\]/g, "")
+    .replace(/\[Status:\s*[^\]]+\]/g, "")
+    .trim();
 
   return {
     id: row.event_id,
@@ -1431,19 +1456,42 @@ export default function Home() {
       localStorage.setItem(`event_status_${eventId}`, newStatus);
     }
 
-    setEventsByDate((current) => ({
-      ...current,
-      [eventDate]: (current[eventDate] ?? []).map((ev) =>
-        ev.id === eventId ? { ...ev, status: newStatus } : ev
-      ),
-    }));
+    let nextAdditionalInfo = "";
+    setEventsByDate((current) => {
+      const updated = { ...current };
+      updated[eventDate] = (current[eventDate] ?? []).map((ev) => {
+        if (ev.id === eventId) {
+          let info = ev.additionalInformation || "";
+          if (/\[Status:\s*[^\]]+\]/.test(info)) {
+            info = info.replace(/\[Status:\s*[^\]]+\]/, `[Status: ${newStatus}]`);
+          } else {
+            info = info ? `${info}\n[Status: ${newStatus}]` : `[Status: ${newStatus}]`;
+          }
+          nextAdditionalInfo = info;
+          return { ...ev, status: newStatus, additionalInformation: info };
+        }
+        return ev;
+      });
+      try {
+        localStorage.setItem("cached_calendar_events", JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
 
     try {
-      await supabase
+      const { error } = await supabase
         .from("events")
-        .update({ status: newStatus })
+        .update({ status: newStatus, additional_info: nextAdditionalInfo })
         .eq("event_id", eventId)
         .eq("user_id", user?.id);
+
+      if (error) {
+        await supabase
+          .from("events")
+          .update({ additional_info: nextAdditionalInfo })
+          .eq("event_id", eventId)
+          .eq("user_id", user?.id);
+      }
     } catch (err) {
       console.error("Could not update status in DB:", err);
     }
@@ -2894,7 +2942,10 @@ function EventDetailsPanel({
   const repeatsMatch = event.additionalInformation?.match(/\[Repeats:\s*([^\]]+)\]/);
   const recurrenceLabel = repeatsMatch ? repeatsMatch[1] : null;
   const cleanNotes = event.additionalInformation
-    ? event.additionalInformation.replace(/\[Repeats:\s*[^\]]+\]/g, "").trim()
+    ? event.additionalInformation
+        .replace(/\[Repeats:\s*[^\]]+\]/g, "")
+        .replace(/\[Status:\s*[^\]]+\]/g, "")
+        .trim()
     : "";
 
   return (
